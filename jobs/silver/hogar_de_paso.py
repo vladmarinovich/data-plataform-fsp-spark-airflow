@@ -16,12 +16,31 @@ def run_silver_hogar():
         
         df_raw = spark.read.parquet(input_path + "/*.parquet")
         
-        df_clean = df_raw.withColumn("id_hogar_de_paso", F.col("id_hogar_de_paso").cast("long")) \
-                         .withColumn("cupo_maximo", F.col("cupo_maximo").cast("int")) \
-                         .withColumn("tarifa_diaria", F.col("tarifa_diaria").cast("double")) \
-                         .withColumn("ultimo_contacto", F.col("ultimo_contacto").cast("timestamp"))
+        # Transformaciones de Negocio (silver_hogar_de_paso.sqlx)
+        # -------------------------------------------------------
         
-        df_clean = df_clean.dropDuplicates(["id_hogar_de_paso"])
+        df_clean = df_raw.withColumn("id_hogar_de_paso", F.col("id_hogar_de_paso").cast("long")) \
+                         .withColumn("cupo_maximo", F.coalesce(F.col("cupo_maximo").cast("int"), F.lit(5))) \
+                         .withColumn("tarifa_diaria", F.coalesce(F.col("tarifa_diaria").cast("double"), F.lit(20000.0))) \
+                         .withColumn("desempeno", F.coalesce(F.col("desempeno").cast("double"), F.lit(3.3))) \
+                         .withColumn("ultimo_contacto", F.coalesce(F.col("ultimo_contacto").cast("timestamp"), F.to_timestamp(F.lit("2024-01-01"))))
+
+        # Normalización y Defaults Texto
+        df_clean = df_clean.withColumn("nombre_hogar", F.trim(F.col("nombre_hogar"))) \
+                           .withColumn("tipo_hogar", F.coalesce(F.lower(F.trim(F.col("tipo_hogar"))), F.lit("albergue"))) \
+                           .withColumn("nombre_contacto", F.trim(F.col("nombre_contacto"))) \
+                           .withColumn("correo", F.coalesce(F.lower(F.trim(F.col("correo"))), F.lit("desconocido"))) \
+                           .withColumn("telefono", F.coalesce(F.trim(F.col("telefono")), F.lit("desconocido"))) \
+                           .withColumn("ciudad", F.coalesce(F.lower(F.trim(F.col("ciudad"))), F.lit("bogota"))) \
+                           .withColumn("pais", F.coalesce(F.initcap(F.trim(F.col("pais"))), F.lit("Colombia")))
+
+        # Filtros Duros (Data Quality)
+        df_clean = df_clean.filter(F.col("nombre_hogar").isNotNull()) \
+                           .filter(F.col("nombre_contacto").isNotNull())
+        
+        # Auditoría
+        df_clean = df_clean.withColumn("fecha_ingesta", F.current_timestamp()) \
+                           .withColumn("fuente", F.lit("raw_hogar_de_paso"))
 
         df_clean.write.mode("overwrite").parquet(output_path)
         print("✅ Hogar de Paso procesado.")

@@ -21,18 +21,45 @@ def run_silver_gastos():
         df_raw = spark.read.option("basePath", input_path).parquet(input_path + "/*")
         if df_raw.rdd.isEmpty(): return
 
-        # Transformaciones
+        # Transformaciones y Reglas de Negocio (Según silver_gastos.sqlx)
+        # ---------------------------------------------------------------
+        
+        # 1. Casting y Defaults
         df_clean = df_raw.withColumn("id_gasto", F.col("id_gasto").cast("long")) \
-                         .withColumn("id_caso", F.col("id_caso").cast("long")) \
+                         .withColumn("id_caso", F.coalesce(F.col("id_caso").cast("long"), F.lit(541))) \
                          .withColumn("id_proveedor", F.col("id_proveedor").cast("long")) \
                          .withColumn("monto", F.col("monto").cast("double")) \
                          .withColumn("fecha_pago", F.col("fecha_pago").cast("timestamp")) \
                          .withColumn("last_modified_at", F.col("last_modified_at").cast("timestamp"))
 
-        # Limpieza Strings
-        for col in ["nombre_gasto", "medio_pago", "estado", "comprobante"]:
-            df_clean = df_clean.withColumn(col, F.trim(F.col(col)))
-            df_clean = df_clean.withColumn(col, F.when(F.col(col) == "nan", None).otherwise(F.col(col)))
+        # 2. Normalización de Strings
+        # medio_pago
+        df_clean = df_clean.withColumn("medio_pago_clean", F.lower(F.trim(F.col("medio_pago"))))
+        df_clean = df_clean.withColumn("medio_pago", 
+            F.when(F.col("medio_pago").isNull(), "nequi")
+             .when(F.col("medio_pago_clean").like("%transferencia%"), "transferencia") # Ojo: definicion decia 'transferencia' no 'transfer'
+             .when(F.col("medio_pago_clean").like("%tarjeta%"), "tarjeta")
+             .otherwise(F.col("medio_pago_clean"))
+        ).drop("medio_pago_clean")
+
+        # estado
+        df_clean = df_clean.withColumn("estado_clean", F.lower(F.trim(F.col("estado"))))
+        df_clean = df_clean.withColumn("estado", 
+            F.when(F.col("estado").isNull(), "exitoso")
+             .otherwise(F.col("estado_clean"))
+        ).drop("estado_clean")
+        
+        # nombre_gasto (Trim + Lower)
+        df_clean = df_clean.withColumn("nombre_gasto", F.lower(F.trim(F.col("nombre_gasto"))))
+
+        # 3. Filtros Duros (Data Quality)
+        # Rechazar gastos sin monto o sin proveedor
+        df_clean = df_clean.filter(F.col("monto").isNotNull()) \
+                           .filter(F.col("id_proveedor").isNotNull())
+
+        # 4. Auditoría
+        df_clean = df_clean.withColumn("fecha_ingesta", F.current_timestamp()) \
+                           .withColumn("fuente", F.lit("raw_gastos"))
 
         # Deduplicación
         window_spec = Window.partitionBy("id_gasto").orderBy(F.col("last_modified_at").desc())

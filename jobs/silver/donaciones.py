@@ -52,33 +52,47 @@ def run_silver_donations():
             print("⚠️  No hay datos para procesar.")
             return
 
-        # 3. Transformaciones y Limpieza
+        # 3. Transformaciones y Limpieza (IMPLEMENTANDO LÓGICA DE NEGOCIO DEFINIDA)
         # -------------------------------------------------------------------------
         
-        print("🛠️  Aplicando transformaciones...")
+        print("🛠️  Aplicando transformaciones de negocio...")
         
-        # A. Casting Explícito de Tipos (Reforzar lo que viene de Raw)
+        # A. Normalización y Defaults (Según silver_donaciones.sqlx)
+        # 1. Defaults FKs: id_donante y id_caso NULL => 541
         df_clean = df_raw.withColumn("id_donacion", F.col("id_donacion").cast("long")) \
-                         .withColumn("id_donante", F.col("id_donante").cast("long")) \
-                         .withColumn("id_caso", F.col("id_caso").cast("long")) \
+                         .withColumn("id_donante", F.coalesce(F.col("id_donante").cast("long"), F.lit(541))) \
+                         .withColumn("id_caso", F.coalesce(F.col("id_caso").cast("long"), F.lit(541))) \
                          .withColumn("monto", F.col("monto").cast("double")) \
                          .withColumn("fecha_donacion", F.col("fecha_donacion").cast("timestamp")) \
-                         .withColumn("last_modified_at", F.col("last_modified_at").cast("timestamp"))
+                         .withColumn("created_at_raw", F.col("created_at").cast("timestamp")) \
+                         .withColumn("created_at", F.coalesce(F.col("created_at").cast("timestamp"), F.col("fecha_donacion").cast("timestamp"))) \
+                         .withColumn("last_modified_at", F.coalesce(F.col("last_modified_at").cast("timestamp"), F.col("fecha_donacion").cast("timestamp")))
 
-        # B. Limpieza de Strings (Trim y nulos a None, aunque Parquet ya maneja nulls)
-        string_cols = ["medio_pago", "estado", "comprobante"]
-        for col in string_cols:
-            df_clean = df_clean.withColumn(col, F.trim(F.col(col)))
-            # Convertir string "nan" o vacíos a NULL real
-            df_clean = df_clean.withColumn(
-                col, 
-                F.when(F.col(col) == "nan", None)
-                 .when(F.col(col) == "", None)
-                 .otherwise(F.col(col))
-            )
+        # Fallback para fechas NULL aplicado arriba ↑
+
+        # 2. Normalización de Strings (medio_pago, estado)
+        # medio_pago: null -> nequi, 'transfer' -> transferencia, 'tarjeta' -> tarjeta
+        df_clean = df_clean.withColumn("medio_pago_clean", F.lower(F.trim(F.col("medio_pago"))))
+        
+        df_clean = df_clean.withColumn("medio_pago", 
+            F.when(F.col("medio_pago").isNull(), "nequi")
+             .when(F.col("medio_pago_clean").like("%transfer%"), "transferencia")
+             .when(F.col("medio_pago_clean").like("%tarjeta%"), "tarjeta")
+             .otherwise(F.col("medio_pago_clean"))
+        ).drop("medio_pago_clean")
+
+        # estado: null -> exitoso
+        df_clean = df_clean.withColumn("estado_clean", F.lower(F.trim(F.col("estado"))))
+        df_clean = df_clean.withColumn("estado", 
+            F.when(F.col("estado").isNull(), "exitoso")
+             .otherwise(F.col("estado_clean"))
+        ).drop("estado_clean")
+
+        # 3. Columnas de Auditoría
+        df_clean = df_clean.withColumn("fecha_ingesta", F.current_timestamp()) \
+                           .withColumn("fuente", F.lit("raw_donaciones"))
 
         # C. Lógica de deduplicación (Snapshotting CDC)
-        # Nos quedamos con la última versión de cada id_donacion basada en last_modified_at
         print("🔄 Deduplicando por ID y fecha de modificación...")
         
         window_spec = Window.partitionBy("id_donacion").orderBy(F.col("last_modified_at").desc())
