@@ -11,6 +11,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 import config
 from jobs.utils.spark_session import get_spark_session
+from jobs.utils.file_utils import rename_spark_output
 
 def run_gold_fact_donaciones():
     spark = get_spark_session("GoldFactDonaciones")
@@ -27,13 +28,16 @@ def run_gold_fact_donaciones():
         # SQLX: LOWER(d.estado) IN ('aprobada', 'completada', 'exitoso')
         df_filtered = df_silver.filter(F.lower(F.col("estado")).isin("aprobada", "completada", "exitoso"))
 
-        # Lógica de Negocio
-        df_enriched = df_filtered.withColumn("es_donacion_valida", F.lit(True)) \
-            .withColumn("es_donacion_critica", 
-                        F.when(F.col("monto") > 500000, True).otherwise(False)) \
-            .withColumn("monto_log", F.log1p(F.col("monto"))) \
-            .withColumn("recencia_donacion_dias", F.datediff(F.current_date(), F.col("fecha_donacion"))) \
-            .withColumn("anio_mes_donacion", F.date_format("fecha_donacion", "yyyy-MM"))
+        # Lógica de Negocio (Idéntica a Dataform)
+        df_enriched = df_filtered.withColumn(
+            "es_donacion_valida", 
+            F.when(F.lower(F.col("estado")) == "aprobada", True).otherwise(False)
+        ).withColumn(
+            "es_donacion_critica", 
+            F.when(F.col("monto") > 500000, True).otherwise(False)
+        ).withColumn("monto_log", F.log1p(F.col("monto"))) \
+         .withColumn("recencia_donacion_dias", F.datediff(F.current_date(), F.col("fecha_donacion"))) \
+         .withColumn("anio_mes_donacion", F.date_format("fecha_donacion", "yyyy-MM"))
 
         # Window para Recencia del Donante (Última donación de ESTE donante)
         window_donante = Window.partitionBy("id_donante")
@@ -42,14 +46,18 @@ def run_gold_fact_donaciones():
                                  .drop("ultima_fecha_donante")
 
         # Columnas de partición física para almacenamiento
-        df_final = df_enriched.withColumn("anio_part", F.year("fecha_donacion")) \
-                              .withColumn("mes_part", F.month("fecha_donacion"))
+        df_final = df_enriched.withColumn("anio", F.year("fecha_donacion")) \
+                              .withColumn("mes", F.lpad(F.month("fecha_donacion"), 2, "0")) \
+                              .withColumn("dia", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
 
         # Escritura Particionada
         (df_final.write.mode("overwrite")
-         .partitionBy("anio_part", "mes_part")
+         .partitionBy("anio", "mes", "dia")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
+         
+        # Renombrar archivos
+        rename_spark_output("gold", "fact_donaciones", output_path)
          
         print("✅ Gold Fact Donaciones procesada.")
         

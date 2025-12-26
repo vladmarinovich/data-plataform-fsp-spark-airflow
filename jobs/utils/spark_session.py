@@ -23,21 +23,36 @@ def get_spark_session(app_name: str = None) -> SparkSession:
     """
     app_name = app_name or config.SPARK_APP_NAME
     
-    spark = (
+    # Configuración base
+    builder = (
         SparkSession.builder
         .appName(app_name)
         .master(config.SPARK_MASTER)
         .config("spark.driver.memory", config.SPARK_DRIVER_MEMORY)
         .config("spark.executor.memory", config.SPARK_EXECUTOR_MEMORY)
-        # Configuraciones adicionales para optimización
+        # Configuración para GCS (Google Cloud Storage)
+        .config("spark.jars", str(config.PROJECT_ROOT / "lib/gcs-connector-hadoop3-latest.jar"))
+        .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+        .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+        .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
+        
+        # Configuraciones de optimización
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
         .config("spark.sql.parquet.compression.codec", "snappy")
-        # Configuración para evitar warnings de Hive
+        
+        # Configuración Warehouse
         .config("spark.sql.warehouse.dir", str(config.PROJECT_ROOT / "spark-warehouse"))
         .config("spark.sql.catalogImplementation", "in-memory")
-        .getOrCreate()
     )
+
+    # Configuración específica para entorno LOCAL
+    if config.ENV == "local":
+        builder = builder.config("spark.ui.enabled", "false") \
+                         .config("spark.driver.bindAddress", "127.0.0.1") \
+                         .config("spark.driver.host", "127.0.0.1")
+
+    spark = builder.getOrCreate()
     
     # Configurar nivel de log (menos verbose)
     spark.sparkContext.setLogLevel("WARN")

@@ -23,6 +23,7 @@ from pyspark.sql.window import Window
 
 import config
 from jobs.utils.spark_session import get_spark_session
+from jobs.utils.file_utils import rename_spark_output
 
 def run_silver_donations():
     """Función principal del pipeline Silver de Donaciones."""
@@ -43,7 +44,7 @@ def run_silver_donations():
         
         # 2. Leer datos Raw (Schema evolution habilitado)
         # Spark infiere particiones anio/mes/dia automáticamente
-        df_raw = spark.read.option("basePath", input_path).parquet(input_path + "/*")
+        df_raw = spark.read.parquet(input_path)
         
         count_raw = df_raw.count()
         print(f"   📊 Registros Raw leídos: {count_raw}")
@@ -57,16 +58,38 @@ def run_silver_donations():
         
         print("🛠️  Aplicando transformaciones de negocio...")
         
-        # A. Normalización y Defaults (Según silver_donaciones.sqlx)
-        # 1. Defaults FKs: id_donante y id_caso NULL => 541
+        # A. Normalización y Defaults (Adaptación Spark vs SQLX)
+        # -------------------------------------------------------------------------
+        # 1. Defaults FKs (ID 541):
+        # Beneficio: Evita errores de JOIN en capas posteriores al asegurar integridad referencial.
+        # Trade-off: Introduce una entidad "ficticia" en el modelo, pero previene pérdida de datos.
+        
+        # 2. Manejo Universal de Fechas (Adaptación Spark):
+        # El raw puede venir como Long (micros de Supabase) o String (ISO local/mock).
+        def cast_to_timestamp(col_name):
+            col = F.col(col_name)
+            # Detectar si la columna es numérica (microsegundos) usando regex
+            return F.when(
+                col.cast("string").rlike(r'^\d+$'), 
+                F.from_unixtime(col.cast("long")/1000000).cast("timestamp")
+            ).otherwise(F.to_timestamp(col))
+            
+        # Aplicamos Fallbacks iniciales
         df_clean = df_raw.withColumn("id_donacion", F.col("id_donacion").cast("long")) \
-                         .withColumn("id_donante", F.coalesce(F.col("id_donante").cast("long"), F.lit(541))) \
-                         .withColumn("id_caso", F.coalesce(F.col("id_caso").cast("long"), F.lit(541))) \
-                         .withColumn("monto", F.col("monto").cast("double")) \
-                         .withColumn("fecha_donacion", F.col("fecha_donacion").cast("timestamp")) \
-                         .withColumn("created_at_raw", F.col("created_at").cast("timestamp")) \
-                         .withColumn("created_at", F.coalesce(F.col("created_at").cast("timestamp"), F.col("fecha_donacion").cast("timestamp"))) \
-                         .withColumn("last_modified_at", F.coalesce(F.col("last_modified_at").cast("timestamp"), F.col("fecha_donacion").cast("timestamp")))
+                         .withColumn("id_donante", F.when(F.col("id_donante").isNull(), 541).otherwise(F.col("id_donante").cast("long"))) \
+                         .withColumn("id_caso", F.when(F.col("id_caso").isNull(), 541).otherwise(F.col("id_caso").cast("long"))) \
+                         .withColumn("monto", F.col("monto").cast("double"))
+                         
+        # Procesar Fechas con Fallbacks
+        # Fallback de created_at/last_modified_at es fecha_donacion
+        df_clean = df_clean.withColumn("fecha_donacion_ts", cast_to_timestamp("fecha_donacion")) \
+                           .withColumn("created_at_ts", cast_to_timestamp("created_at")) \
+                           .withColumn("last_modified_at_ts", cast_to_timestamp("last_modified_at"))
+        
+        df_clean = df_clean.withColumn("fecha_donacion", F.col("fecha_donacion_ts")) \
+                           .withColumn("created_at", F.coalesce(F.col("created_at_ts"), F.col("fecha_donacion_ts"))) \
+                           .withColumn("last_modified_at", F.coalesce(F.col("last_modified_at_ts"), F.col("fecha_donacion_ts"))) \
+                           .drop("fecha_donacion_ts", "created_at_ts", "last_modified_at_ts")
 
         # Fallback para fechas NULL aplicado arriba ↑
 
@@ -104,32 +127,73 @@ def run_silver_donations():
         count_dedup = df_dedup.count()
         print(f"   ✅ Registros tras deduplicación: {count_dedup} (Descartados: {count_raw - count_dedup})")
 
-        # D. Reglas de Negocio / Enriquecimiento
-        # Asegurar que monto sea positivo
-        df_final = df_dedup.filter(F.col("monto") >= 0)
-        
-        # Generar columnas de partición limpias (anio, mes) desde fecha_donacion
-        # (A veces las particiones raw vienen como strings, mejor regenerarlas desde la fecha real)
-        df_final = df_final.withColumn("anio_part", F.year("fecha_donacion")) \
-                           .withColumn("mes_part", F.month("fecha_donacion"))
-
-        # 4. Escritura en Capa Silver
+        # D. Calidad de Datos (Data Quality - DQ) y Cuarentena
         # -------------------------------------------------------------------------
-        print(f"💾 Escribiendo a Silver: {output_path}")
+        print("🛡️  Validando calidad de datos (Assertions)...")
         
-        # Escribimos particionado por Anio/Mes (Granularidad mensual es suficiente para analítica histórica)
-        # Mode: Overwrite (reemplaza las particiones afectadas, o Dynamic Partition Overwrite si se configura)
-        # Para simplificar y garantizar consistencia, usamos overwrite a nivel partición
+        # Definimos las reglas de validación
+        df_dq = df_dedup.withColumn("dq_errors", F.array())
+        
+        # Regla 1: Monto no negativo
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when(F.col("monto") < 0, 
+                F.array_union(F.col("dq_errors"), F.array(F.lit("MONTO_NEGATIVO")))
+            ).otherwise(F.col("dq_errors"))
+        )
+        
+        # Regla 2: Fecha de donación no futura
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when(F.col("fecha_donacion") > F.current_timestamp(),
+                F.array_union(F.col("dq_errors"), F.array(F.lit("FECHA_FUTURA")))
+            ).otherwise(F.col("dq_errors"))
+        )
+        
+        # Regla 3: ID de donación debe existir
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when(F.col("id_donacion").isNull(),
+                F.array_union(F.col("dq_errors"), F.array(F.lit("ID_NULO")))
+            ).otherwise(F.col("dq_errors"))
+        )
+
+        # Dividimos el dataset: Silver vs Cuarentena
+        df_final = df_dq.filter(F.size(F.col("dq_errors")) == 0).drop("dq_errors")
+        df_quarantine = df_dq.filter(F.size(F.col("dq_errors")) > 0)
+        
+        count_silver = df_final.count()
+        count_dirty = df_quarantine.count()
+        
+        print(f"   ✨ Registros Válidos (Silver): {count_silver}")
+        print(f"   ☣️  Registros en Cuarentena: {count_dirty}")
+
+        # E. Generación de Particiones para escritura
+        df_final = df_final.withColumn("anio", F.year("fecha_donacion")) \
+                           .withColumn("mes", F.lpad(F.month("fecha_donacion"), 2, "0")) \
+                           .withColumn("dia", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
+
+        # 4. Escritura en Capa Silver y Cuarentena
+        # -------------------------------------------------------------------------
+        # A. Escribir Cuarentena (si hay datos sucios)
+        if count_dirty > 0:
+            quarantine_path = f"{config.PROJECT_ROOT}/data/quarantine/donaciones"
+            print(f"☣️  Guardando datos sucios en: {quarantine_path}")
+            df_quarantine.write.mode("append").parquet(quarantine_path)
+            # Convertimos el array de errores a string para que el log sea legible
+            df_quarantine.select("id_donacion", "dq_errors").show(truncate=False)
+
+        print(f"💾 Escribiendo a Silver: {output_path}")
         
         (
             df_final.write
             .mode("overwrite")
-            .partitionBy("anio_part", "mes_part")
+            .partitionBy("anio", "mes", "dia")
             .format("parquet")
             .option("compression", "snappy")
-            .option("partitionOverwriteMode", "dynamic") # Clave para no borrar todo el histórico, solo actualizar lo cambiado
+            .option("partitionOverwriteMode", "dynamic")
             .save(output_path)
         )
+        
+        # Renombrar archivos al estándar del proyecto
+        rename_spark_output("silver", "donaciones", output_path)
         
         print("✅ Escritura completada exitosamente.")
         print("="*80)

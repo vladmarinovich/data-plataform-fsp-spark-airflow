@@ -2,55 +2,34 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
 venv/
-env/
-ENV/
-.venv
+venv_airflow/
+.env
 
-# Spark
-*.log
-metastore_db/
+# Spark/Hadoop
 spark-warehouse/
 derby.log
+metastore_db/
 
 # Airflow
-airflow/
+airflow.db
+airflow.cfg
+webserver_config.py
+standalone_admin_password.txt
 logs/
-*.pid
+plugins/
 
-# Data
-data/raw/*
-data/processed/*
-data/output/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/output/.gitkeep
+# Datos (NUNCA SUBIR ESTO)
+data/
+raw/
+silver/
+gold/
+quarantine/
 
-# Environment
-.env
-.env.local
-watermarks.json
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Docker
+.docker/
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Notebooks
-.ipynb_checkpoints/
-*.ipynb
 references/
-data/
