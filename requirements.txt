@@ -1,0 +1,16 @@
+
+# Core ETL
+pandas>=2.0.0
+pyspark>=3.5.0
+pyarrow>=14.0.0
+
+# Cloud Connectors (GCP)
+google-cloud-storage>=2.13.0
+google-cloud-bigquery>=3.13.0
+db-dtypes>=1.2.0
+
+# Source Connectors (Supabase)
+supabase>=2.0.0
+
+# Configuration & Utils
+python-dotenv>=1.0.0
