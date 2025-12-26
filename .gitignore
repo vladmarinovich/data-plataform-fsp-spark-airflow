@@ -52,3 +52,5 @@ htmlcov/
 # Notebooks
 .ipynb_checkpoints/
 *.ipynb
+references/
+data/
