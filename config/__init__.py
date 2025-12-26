@@ -9,6 +9,15 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
+# Detectar entorno y base path
+if os.path.exists("/opt/airflow"): # Si existe esta ruta, estamos en Docker
+    BASE_DIR = Path("/opt/airflow")
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Entorno de Ejecución (default: local)
+ENV = os.getenv("ENV", "local") # local | prod
+
 # ============================================
 # PATHS - Rutas del Proyecto
 # ============================================
@@ -26,31 +35,34 @@ for directory in [DATA_RAW_DIR, DATA_PROCESSED_DIR, DATA_OUTPUT_DIR, LOGS_DIR]:
 # ============================================
 # STORAGE CONFIGURATION (Cloud Agnostic)
 # ============================================
-# ============================================
-# STORAGE CONFIGURATION (Cloud Agnostic)
-# ============================================
 PROJECT_ID = "salvando-patitas-de-spark"
 
-# ============================================
-# STORAGE CONFIGURATION (Cloud Agnostic)
-# ============================================
-PROJECT_ID = "salvando-patitas-de-spark"
+if ENV == "local":
+    # --- CONFIGURACIÓN LOCAL ---
+    print("🌍 MODO: LOCAL (Usando sistema de archivos local)")
+    STORAGE_PROTOCOL = "file://"
+    # Usar ruta absoluta para evitar problemas con file:// en Spark
+    LOCAL_LAKE_PATH = str(DATA_DIR / "lake")
+    RAW_PATH =    str(Path(LOCAL_LAKE_PATH) / "raw")
+    SILVER_PATH = str(Path(LOCAL_LAKE_PATH) / "silver")
+    GOLD_PATH =   str(Path(LOCAL_LAKE_PATH) / "gold")
+    
+    # Asegurar que existan carpetas locales
+    Path(RAW_PATH).mkdir(parents=True, exist_ok=True)
+    Path(SILVER_PATH).mkdir(parents=True, exist_ok=True)
+    Path(GOLD_PATH).mkdir(parents=True, exist_ok=True)
 
-# --- OPCIÓN 1: PROD / GCS ---
-STORAGE_PROTOCOL = "gs://"
-BUCKET_RAW = "salvando-patitas-spark-raw"
-BUCKET_SILVER = "salvando-patitas-spark-silver"
-BUCKET_GOLD = "salvando-patitas-spark-gold"
-RAW_PATH = f"{STORAGE_PROTOCOL}{BUCKET_RAW}"
-SILVER_PATH = f"{STORAGE_PROTOCOL}{BUCKET_SILVER}"
-GOLD_PATH = f"{STORAGE_PROTOCOL}{BUCKET_GOLD}"
-
-# --- OPCIÓN 2: LOCAL DEV (Testing rápido) ---
-# STORAGE_PROTOCOL = "file://"
-# LOCAL_LAKE_PATH = str(PROJECT_ROOT / "data/lake")
-# RAW_PATH =    f"{STORAGE_PROTOCOL}{LOCAL_LAKE_PATH}/raw"
-# SILVER_PATH = f"{STORAGE_PROTOCOL}{LOCAL_LAKE_PATH}/silver"
-# GOLD_PATH =   f"{STORAGE_PROTOCOL}{LOCAL_LAKE_PATH}/gold"
+else:
+    # --- CONFIGURACIÓN PROD / GCS ---
+    print("☁️ MODO: CLOUD (Usando Google Cloud Storage)")
+    STORAGE_PROTOCOL = "gs://"
+    BUCKET_RAW = "salvando-patitas-spark-raw"
+    BUCKET_SILVER = "salvando-patitas-spark-silver"
+    BUCKET_GOLD = "salvando-patitas-spark-gold"
+    
+    RAW_PATH = f"{STORAGE_PROTOCOL}{BUCKET_RAW}"
+    SILVER_PATH = f"{STORAGE_PROTOCOL}{BUCKET_SILVER}"
+    GOLD_PATH = f"{STORAGE_PROTOCOL}{BUCKET_GOLD}"
 
 # ============================================
 # SUPABASE - Credenciales

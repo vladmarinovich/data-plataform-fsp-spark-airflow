@@ -10,6 +10,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 import config
 from jobs.utils.spark_session import get_spark_session
+from jobs.utils.file_utils import rename_spark_output
 
 def run_silver_donantes():
     spark = get_spark_session("SilverDonantes")
@@ -21,27 +22,33 @@ def run_silver_donantes():
         # Leemos todo raw (Particionado Hive se lee transparente)
         # Nota: Raw donantes está particionado por fecha actualización.
         # Aquí consolidamos la ÚLTIMA versión de cada donante.
-        df_raw = spark.read.option("basePath", input_path).parquet(input_path + "/*")
+        df_raw = spark.read.parquet(input_path)
         if df_raw.rdd.isEmpty(): return
 
         # Transformaciones de Negocio (silver_donantes.sqlx)
         # --------------------------------------------------
         
-        # Casting
-        df_clean = df_raw.withColumn("id_donante", F.col("id_donante").cast("long")) \
-                         .withColumn("last_modified_at", F.col("last_modified_at").cast("timestamp")) \
-                         .withColumn("created_at", F.col("created_at").cast("timestamp"))
+        # Casting y Defaults (Adaptación Spark Robusta)
+        def cast_to_timestamp(col_name):
+            col = F.col(col_name)
+            return F.when(
+                col.cast("string").rlike(r'^\d+$'), 
+                F.from_unixtime(col.cast("long")/1000000).cast("timestamp")
+            ).otherwise(F.to_timestamp(col))
 
-        # Normalización y Defaults
-        df_clean = df_clean.withColumn("donante", F.coalesce(F.upper(F.trim(F.col("donante"))), F.lit("ANONIMO"))) \
-                           .withColumn("tipo_id", F.coalesce(F.lower(F.trim(F.col("tipo_id"))), F.lit("nn"))) \
-                           .withColumn("identificacion", F.coalesce(F.lower(F.trim(F.col("identificacion"))), F.lit("nn"))) \
+        df_clean = df_raw.withColumn("id_donante", F.col("id_donante").cast("long")) \
+                         .withColumn("id_organizacion", F.col("id_organizacion").cast("long"))
+        
+        # Procesar Fechas
+        df_clean = df_clean.withColumn("created_at", cast_to_timestamp("created_at")) \
+                           .withColumn("last_modified_at", cast_to_timestamp("last_modified_at"))
+
+        # Normalización y Defaults (Columnas Reales)
+        df_clean = df_clean.withColumn("nombre", F.coalesce(F.upper(F.trim(F.col("nombre"))), F.lit("ANONIMO"))) \
                            .withColumn("correo", F.coalesce(F.lower(F.trim(F.col("correo"))), F.lit("desconocido"))) \
+                           .withColumn("telefono", F.coalesce(F.trim(F.col("telefono")), F.lit("nn"))) \
                            .withColumn("ciudad", F.coalesce(F.lower(F.trim(F.col("ciudad"))), F.lit("bogota"))) \
-                           .withColumn("tipo_donante", F.coalesce(F.lower(F.trim(F.col("tipo_donante"))), F.lit("unico"))) \
-                           .withColumn("pais", F.coalesce(F.upper(F.trim(F.col("pais"))), F.lit("COLOMBIA"))) \
-                           .withColumn("canal_origen", F.coalesce(F.lower(F.trim(F.col("canal_origen"))), F.lit("organico"))) \
-                           .withColumn("consentimiento", F.coalesce(F.col("consentimiento").cast("boolean"), F.lit(True)))
+                           .withColumn("pais", F.coalesce(F.upper(F.trim(F.col("pais"))), F.lit("COLOMBIA")))
 
         
         # Auditoría
@@ -52,13 +59,20 @@ def run_silver_donantes():
         window_spec = Window.partitionBy("id_donante").orderBy(F.col("last_modified_at").desc())
         df_dedup = df_clean.withColumn("row_num", F.row_number().over(window_spec)).filter(F.col("row_num") == 1).drop("row_num")
 
-        # Remover particiones viejas de hive (anio, mes, dia) si se leyeron, para no ensuciar la master
-        cols_to_drop = [c for c in ["anio", "mes", "dia"] if c in df_dedup.columns]
-        df_final = df_dedup.drop(*cols_to_drop)
+        # Particionamiento derivado
+        df_final = df_dedup.withColumn("anio", F.year("created_at").cast("string")) \
+                           .withColumn("mes", F.lpad(F.month("created_at"), 2, "0")) \
+                           .withColumn("dia", F.lpad(F.dayofmonth("created_at"), 2, "0"))
 
-        # Escritura (Sin partición, Overwrite Full)
-        # Es una tabla dimensional < 1GB, no requiere partición.
-        (df_final.write.mode("overwrite").parquet(output_path))
+        # Escritura (Particionado por Fecha de Creación)
+        (df_final.write.mode("overwrite")
+         .partitionBy("anio", "mes", "dia")
+         .option("partitionOverwriteMode", "dynamic")
+         .parquet(output_path))
+        
+        # Renombrar archivos al estándar
+        rename_spark_output("silver", "donantes", output_path)
+        
         print("✅ Donantes procesados.")
 
     finally:

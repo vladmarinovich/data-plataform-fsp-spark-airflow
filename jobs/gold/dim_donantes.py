@@ -45,15 +45,30 @@ def run_gold_dim_donantes():
             F.col("mes").alias("mes_creacion"),
             F.col("anio_mes").alias("anio_mes_creacion"),
             F.col("trimestre").alias("trimestre_creacion"),
+            F.col("anio_trimestre").alias("anio_trimestre_creacion"),
             F.col("semestre").alias("semestre_creacion"),
+            F.col("anio_semestre").alias("anio_semestre_creacion"),
             F.col("semana_iso").alias("semana_creacion")
         )
         
         df_final = df_enriched.join(cal_cols, F.to_date(df_enriched.created_at) == cal_cols.fecha, "left") \
                               .drop("fecha") # Drop key redundancy
 
+        # Particionado para el Lake (Mandatory)
+        df_final = df_final.withColumn("anio", F.year("created_at").cast("string")) \
+                           .withColumn("mes", F.lpad(F.month("created_at"), 2, "0")) \
+                           .withColumn("dia", F.lpad(F.dayofmonth("created_at"), 2, "0"))
+
         # Escritura
-        df_final.write.mode("overwrite").parquet(output_path)
+        (df_final.write.mode("overwrite")
+         .partitionBy("anio", "mes", "dia")
+         .option("partitionOverwriteMode", "dynamic")
+         .parquet(output_path))
+        
+        # Renombrar archivos
+        from jobs.utils.file_utils import rename_spark_output
+        rename_spark_output("gold", "dim_donantes", output_path)
+        
         print("✅ Gold Dim Donantes procesada.")
         
     finally:

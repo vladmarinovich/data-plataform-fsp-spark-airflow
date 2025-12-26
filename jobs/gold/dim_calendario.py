@@ -11,6 +11,7 @@ from pyspark.sql import functions as F
 from pyspark.sql import types as T
 import config
 from jobs.utils.spark_session import get_spark_session
+from jobs.utils.file_utils import rename_spark_output
 
 def run_dim_calendario():
     spark = get_spark_session("GoldDimCalendario")
@@ -42,6 +43,10 @@ def run_dim_calendario():
 
         # Escritura
         (df_cal.write.mode("overwrite").parquet(output_path))
+        
+        # Renombrar archivos
+        rename_spark_output("gold", "dim_calendario", output_path)
+        
         print(f"✅ Dim Calendario generada: {df_cal.count()} días.")
         
     finally:

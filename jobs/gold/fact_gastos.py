@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from pyspark.sql import functions as F
 import config
 from jobs.utils.spark_session import get_spark_session
+from jobs.utils.file_utils import rename_spark_output
 
 def run_gold_fact_gastos():
     spark = get_spark_session("GoldFactGastos")
@@ -45,13 +46,17 @@ def run_gold_fact_gastos():
                                  .withColumn("recencia_gasto_dias", F.datediff(F.current_date(), F.col("fecha_pago")))
         
         # Particionamiento
-        df_final = df_enriched.withColumn("anio_part", F.year("fecha_pago")) \
-                              .withColumn("mes_part", F.month("fecha_pago"))
+        df_final = df_enriched.withColumn("anio", F.year("fecha_pago")) \
+                              .withColumn("mes", F.lpad(F.month("fecha_pago"), 2, "0")) \
+                              .withColumn("dia", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
         
         (df_final.write.mode("overwrite")
-         .partitionBy("anio_part", "mes_part")
+         .partitionBy("anio", "mes", "dia")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
+         
+        # Renombrar archivos
+        rename_spark_output("gold", "fact_gastos", output_path)
          
         print("✅ Gold Fact Gastos procesada.")
 
