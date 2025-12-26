@@ -24,14 +24,29 @@ def run_silver_donantes():
         df_raw = spark.read.option("basePath", input_path).parquet(input_path + "/*")
         if df_raw.rdd.isEmpty(): return
 
-        # Transformaciones
+        # Transformaciones de Negocio (silver_donantes.sqlx)
+        # --------------------------------------------------
+        
+        # Casting
         df_clean = df_raw.withColumn("id_donante", F.col("id_donante").cast("long")) \
-                         .withColumn("consentimiento", F.col("consentimiento").cast("boolean")) \
                          .withColumn("last_modified_at", F.col("last_modified_at").cast("timestamp")) \
                          .withColumn("created_at", F.col("created_at").cast("timestamp"))
 
-        # Limpieza (Drop sensitive/heavy cols if needed, but we keep them for Silver)
-        # Si quisieramos anonimizar, sería aquí.
+        # Normalización y Defaults
+        df_clean = df_clean.withColumn("donante", F.coalesce(F.upper(F.trim(F.col("donante"))), F.lit("ANONIMO"))) \
+                           .withColumn("tipo_id", F.coalesce(F.lower(F.trim(F.col("tipo_id"))), F.lit("nn"))) \
+                           .withColumn("identificacion", F.coalesce(F.lower(F.trim(F.col("identificacion"))), F.lit("nn"))) \
+                           .withColumn("correo", F.coalesce(F.lower(F.trim(F.col("correo"))), F.lit("desconocido"))) \
+                           .withColumn("ciudad", F.coalesce(F.lower(F.trim(F.col("ciudad"))), F.lit("bogota"))) \
+                           .withColumn("tipo_donante", F.coalesce(F.lower(F.trim(F.col("tipo_donante"))), F.lit("unico"))) \
+                           .withColumn("pais", F.coalesce(F.upper(F.trim(F.col("pais"))), F.lit("COLOMBIA"))) \
+                           .withColumn("canal_origen", F.coalesce(F.lower(F.trim(F.col("canal_origen"))), F.lit("organico"))) \
+                           .withColumn("consentimiento", F.coalesce(F.col("consentimiento").cast("boolean"), F.lit(True)))
+
+        
+        # Auditoría
+        df_clean = df_clean.withColumn("fecha_ingesta", F.current_timestamp()) \
+                           .withColumn("fuente", F.lit("raw_donantes"))
 
         # Deduplicación Maestra
         window_spec = Window.partitionBy("id_donante").orderBy(F.col("last_modified_at").desc())

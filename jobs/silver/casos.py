@@ -21,17 +21,36 @@ def run_silver_casos():
         df_raw = spark.read.option("basePath", input_path).parquet(input_path + "/*")
         if df_raw.rdd.isEmpty(): return
 
-        # Transformaciones
+        # Transformaciones de Negocio (silver_casos.sqlx)
+        # -----------------------------------------------
+        
+        # Casting y Defaults Numéricos
         df_clean = df_raw.withColumn("id_caso", F.col("id_caso").cast("long")) \
-                         .withColumn("id_hogar_de_paso", F.col("id_hogar_de_paso").cast("long")) \
-                         .withColumn("presupuesto_estimado", F.col("presupuesto_estimado").cast("double")) \
+                         .withColumn("id_hogar_de_paso", F.coalesce(F.col("id_hogar_de_paso").cast("long"), F.lit(9))) \
+                         .withColumn("presupuesto_estimado", F.coalesce(F.col("presupuesto_estimado").cast("double"), F.lit(3500000.0))) \
                          .withColumn("fecha_ingreso", F.col("fecha_ingreso").cast("timestamp")) \
                          .withColumn("fecha_salida", F.col("fecha_salida").cast("timestamp")) \
                          .withColumn("last_modified_at", F.col("last_modified_at").cast("timestamp"))
 
-        for col in ["nombre_caso", "estado", "veterinaria", "diagnostico", "ciudad"]:
-            df_clean = df_clean.withColumn(col, F.trim(F.col(col)))
-            df_clean = df_clean.withColumn(col, F.when(F.col(col) == "nan", None).otherwise(F.col(col)))
+        # Normalización Strings y Defaults
+        # nombre_caso
+        df_clean = df_clean.withColumn("nombre_caso", F.coalesce(F.trim(F.col("nombre_caso")), F.lit("desconocido")))
+        
+        # veterinaria
+        df_clean = df_clean.withColumn("veterinaria", F.coalesce(F.lower(F.trim(F.col("veterinaria"))), F.lit("desconocido")))
+        
+        # diagnostico
+        df_clean = df_clean.withColumn("diagnostico", F.coalesce(F.lower(F.trim(F.col("diagnostico"))), F.lit("reservado")))
+        
+        # ciudad
+        df_clean = df_clean.withColumn("ciudad", F.coalesce(F.lower(F.trim(F.col("ciudad"))), F.lit("bogota")))
+        
+        # estado
+        df_clean = df_clean.withColumn("estado", F.lower(F.trim(F.col("estado"))))
+
+        # Auditoría
+        df_clean = df_clean.withColumn("fecha_ingesta", F.current_timestamp()) \
+                           .withColumn("fuente", F.lit("raw_casos"))
 
         # Deduplicación
         window_spec = Window.partitionBy("id_caso").orderBy(F.col("last_modified_at").desc())
