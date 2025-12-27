@@ -1,0 +1,2 @@
+[[34m2025-12-26T22:45:37.055+0000[0m] {[34mwebserver_command.py:[0m260} ERROR[0m - [0 / 0] Some workers seem to have died and gunicorn did not restart them as expected[0m
+[[34m2025-12-26T22:45:47.299+0000[0m] {[34mwebserver_command.py:[0m272} INFO[0m - [0 / 0] Spawning 1 workers[0m

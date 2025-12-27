@@ -46,13 +46,13 @@ def run_gold_fact_donaciones():
                                  .drop("ultima_fecha_donante")
 
         # Columnas de partición física para almacenamiento
-        df_final = df_enriched.withColumn("anio", F.year("fecha_donacion")) \
-                              .withColumn("mes", F.lpad(F.month("fecha_donacion"), 2, "0")) \
-                              .withColumn("dia", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
+        df_final = df_enriched.withColumn("y", F.year("fecha_donacion")) \
+                              .withColumn("m", F.lpad(F.month("fecha_donacion"), 2, "0")) \
+                              .withColumn("d", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
 
         # Escritura Particionada
         (df_final.write.mode("overwrite")
-         .partitionBy("anio", "mes", "dia")
+         .partitionBy("y", "m", "d")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
          

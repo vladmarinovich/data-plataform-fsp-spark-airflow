@@ -24,13 +24,13 @@ def run_gold_dim_casos():
         # Particionado para el Lake (Mandatory para Casos)
         df_final = df_casos.withColumn("es_caso_urgente", F.when(F.col("estado") == "urgente", True).otherwise(False)) \
                            .withColumn("dias_en_sistema", F.datediff(F.current_date(), F.col("fecha_ingreso"))) \
-                           .withColumn("anio", F.year("fecha_ingreso").cast("string")) \
-                           .withColumn("mes", F.lpad(F.month("fecha_ingreso"), 2, "0")) \
-                           .withColumn("dia", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
+                           .withColumn("y", F.year("fecha_ingreso").cast("string")) \
+                           .withColumn("m", F.lpad(F.month("fecha_ingreso"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
                            
         # Escritura
         (df_final.write.mode("overwrite")
-         .partitionBy("anio", "mes", "dia")
+         .partitionBy("y", "m", "d")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
         rename_spark_output("gold", "dim_casos", output_path)

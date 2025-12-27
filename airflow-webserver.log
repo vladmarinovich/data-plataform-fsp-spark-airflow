@@ -1,0 +1,2 @@
+2025-12-26 22:45:37,055 ERROR - [0 / 0] Some workers seem to have died and gunicorn did not restart them as expected
+2025-12-26 22:45:47,299 INFO - [0 / 0] Spawning 1 workers

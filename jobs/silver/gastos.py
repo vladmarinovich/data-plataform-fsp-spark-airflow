@@ -68,12 +68,12 @@ def run_silver_gastos():
         df_dedup = df_clean.withColumn("row_num", F.row_number().over(window_spec)).filter(F.col("row_num") == 1).drop("row_num")
 
         # Particionamiento derivado
-        df_final = df_dedup.withColumn("anio", F.year("fecha_pago")) \
-                           .withColumn("mes", F.lpad(F.month("fecha_pago"), 2, "0")) \
-                           .withColumn("dia", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
+        df_final = df_dedup.withColumn("y", F.year("fecha_pago")) \
+                           .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
 
         # Escritura
-        (df_final.write.mode("overwrite").partitionBy("anio", "mes", "dia")
+        (df_final.write.mode("overwrite").partitionBy("y", "m", "d")
          .option("partitionOverwriteMode", "dynamic").parquet(output_path))
         
         # Renombrar archivos al estándar

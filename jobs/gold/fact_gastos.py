@@ -46,12 +46,12 @@ def run_gold_fact_gastos():
                                  .withColumn("recencia_gasto_dias", F.datediff(F.current_date(), F.col("fecha_pago")))
         
         # Particionamiento
-        df_final = df_enriched.withColumn("anio", F.year("fecha_pago")) \
-                              .withColumn("mes", F.lpad(F.month("fecha_pago"), 2, "0")) \
-                              .withColumn("dia", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
+        df_final = df_enriched.withColumn("y", F.year("fecha_pago")) \
+                              .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
+                              .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
         
         (df_final.write.mode("overwrite")
-         .partitionBy("anio", "mes", "dia")
+         .partitionBy("y", "m", "d")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
          

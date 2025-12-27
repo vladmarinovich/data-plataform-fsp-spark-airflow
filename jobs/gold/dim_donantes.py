@@ -55,13 +55,13 @@ def run_gold_dim_donantes():
                               .drop("fecha") # Drop key redundancy
 
         # Particionado para el Lake (Mandatory)
-        df_final = df_final.withColumn("anio", F.year("created_at").cast("string")) \
-                           .withColumn("mes", F.lpad(F.month("created_at"), 2, "0")) \
-                           .withColumn("dia", F.lpad(F.dayofmonth("created_at"), 2, "0"))
+        df_final = df_final.withColumn("y", F.year("created_at").cast("string")) \
+                           .withColumn("m", F.lpad(F.month("created_at"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("created_at"), 2, "0"))
 
         # Escritura
         (df_final.write.mode("overwrite")
-         .partitionBy("anio", "mes", "dia")
+         .partitionBy("y", "m", "d")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
         
