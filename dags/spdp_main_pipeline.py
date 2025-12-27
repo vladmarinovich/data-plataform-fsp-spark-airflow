@@ -154,7 +154,8 @@ with DAG(
     [g_fact_gastos, g_feat_casos, g_dim_cal] >> g_dash_gastos
     
     # dashboard_financiero: CONSOLIDA los otros dos dashboards
-    [g_dash_don, g_dash_gastos, g_dim_cal] >> g_dash_fin
+    # (hereda calendario de ellos - join por fecha/día)
+    [g_dash_don, g_dash_gastos] >> g_dash_fin
 
 
 
