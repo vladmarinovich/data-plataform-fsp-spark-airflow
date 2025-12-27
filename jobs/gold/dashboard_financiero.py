@@ -37,7 +37,6 @@ def run_gold_dashboard_financiero():
             F.lit(None).alias("id_caso"),
             "monto",
             F.lit(False).alias("es_gasto"),
-            F.lit(False).alias("es_gasto_critico"),
             F.lit(False).alias("sobrepresupuesto"),
             "tamano_donacion" # categoria_monto
         )
@@ -49,7 +48,6 @@ def run_gold_dashboard_financiero():
             "id_caso",
             "monto",
             F.lit(True).alias("es_gasto"),
-            "es_gasto_critico",
             "sobrepresupuesto",
             "categoria_monto"
         )
@@ -60,7 +58,6 @@ def run_gold_dashboard_financiero():
         df_agg = df_movimientos.groupBy("anio_mes").agg(
             F.sum(F.when(F.col("es_gasto") == False, F.col("monto")).otherwise(0)).alias("total_donado"),
             F.sum(F.when(F.col("es_gasto") == True, F.col("monto")).otherwise(0)).alias("total_gastado"),
-            F.sum(F.when(F.col("es_gasto_critico") == True, F.col("monto")).otherwise(0)).alias("total_gasto_critico"),
             F.sum(F.when(F.col("sobrepresupuesto") == True, F.col("monto")).otherwise(0)).alias("gastos_sobrepresupuesto"),
             F.countDistinct("id_caso").alias("casos_activos_mes"),
             F.countDistinct("id_donante").alias("donantes_activos_mes"),
@@ -80,8 +77,6 @@ def run_gold_dashboard_financiero():
             "rolling_3m_ingresos", F.sum("total_donado").over(window_rolling)
         ).withColumn(
             "rolling_3m_gastos", F.sum("total_gastado").over(window_rolling)
-        ).withColumn(
-            "porcentaje_gasto_critico", F.col("total_gasto_critico") / F.col("total_gastado")
         ).withColumn(
             "porcentaje_sobrepresupuesto", F.col("gastos_sobrepresupuesto") / F.col("total_gastado")
         ).withColumn(
