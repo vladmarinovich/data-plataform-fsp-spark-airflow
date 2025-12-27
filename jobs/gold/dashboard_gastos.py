@@ -20,13 +20,13 @@ def run_gold_dashboard_gastos():
         
         # Paths
         fact_gastos_path = f"{config.GOLD_PATH}/fact_gastos"
-        silver_proveedores_path = f"{config.SILVER_PATH}/proveedores"
+        dim_proveedores_path = f"{config.GOLD_PATH}/dim_proveedores"
         silver_casos_path = f"{config.SILVER_PATH}/casos"
         output_path = f"{config.GOLD_PATH}/dashboard_gastos"
         
         # Lectura
         df_fact = spark.read.parquet(fact_gastos_path)
-        df_dim_prov = spark.read.parquet(silver_proveedores_path)
+        df_dim_prov = spark.read.parquet(dim_proveedores_path)
         df_dim_casos = spark.read.parquet(silver_casos_path)
         
         # Join
@@ -36,11 +36,14 @@ def run_gold_dashboard_gastos():
             df_dim_casos.alias("c"), "id_caso", "left"
         ).select(
             "g.*",
-            "p.nombre_proveedor", "p.categoria_proveedor", 
+            "p.nombre_proveedor",
+            "p.categoria_proveedor",
             F.col("p.ciudad_normalizada").alias("proveedor_ciudad"),
-            F.col("p.tiene_id_valido").alias("proveedor_id_valido"),
-            "c.nombre_caso", F.col("c.estado").alias("estado_caso"),
-            "c.presupuesto_estimado", "c.fecha_salida"
+            "p.tiene_id_valido",
+            "c.nombre_caso",
+            F.col("c.estado").alias("estado_caso"),
+            "c.presupuesto_estimado",
+            "c.fecha_salida"
         )
         
         window_prov = Window.partitionBy("id_proveedor")
