@@ -20,14 +20,14 @@ def run_gold_dashboard_gastos():
         
         # Paths
         fact_gastos_path = f"{config.GOLD_PATH}/fact_gastos"
-        dim_proveedores_path = f"{config.GOLD_PATH}/dim_proveedores"
-        dim_casos_path = f"{config.GOLD_PATH}/dim_casos"
+        silver_proveedores_path = f"{config.SILVER_PATH}/proveedores"
+        silver_casos_path = f"{config.SILVER_PATH}/casos"
         output_path = f"{config.GOLD_PATH}/dashboard_gastos"
         
         # Lectura
         df_fact = spark.read.parquet(fact_gastos_path)
-        df_dim_prov = spark.read.parquet(dim_proveedores_path)
-        df_dim_casos = spark.read.parquet(dim_casos_path)
+        df_dim_prov = spark.read.parquet(silver_proveedores_path)
+        df_dim_casos = spark.read.parquet(silver_casos_path)
         
         # Join
         df_base = df_fact.alias("g").join(
