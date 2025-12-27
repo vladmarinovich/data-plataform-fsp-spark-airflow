@@ -112,11 +112,11 @@ def run_silver_casos():
             df_quarantine.select("id_caso", "nombre_caso", "dq_errors").show(truncate=False)
 
         # Derivar particiones
-        df_final = df_final.withColumn("anio", F.year("fecha_ingreso")) \
-                           .withColumn("mes", F.lpad(F.month("fecha_ingreso"), 2, "0")) \
-                           .withColumn("dia", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
+        df_final = df_final.withColumn("y", F.year("fecha_ingreso")) \
+                           .withColumn("m", F.lpad(F.month("fecha_ingreso"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
 
-        (df_final.write.mode("overwrite").partitionBy("anio", "mes", "dia")
+        (df_final.write.mode("overwrite").partitionBy("y", "m", "d")
          .option("partitionOverwriteMode", "dynamic").parquet(output_path))
         
         # Renombrar archivos al estándar

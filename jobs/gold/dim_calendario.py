@@ -28,9 +28,9 @@ def run_dim_calendario():
         """)
         
         # Enriquecer con atributos
-        df_cal = df_dates.withColumn("anio", F.year("fecha")) \
-                         .withColumn("mes", F.month("fecha")) \
-                         .withColumn("dia", F.dayofmonth("fecha")) \
+        df_cal = df_dates.withColumn("y", F.year("fecha")) \
+                         .withColumn("m", F.month("fecha")) \
+                         .withColumn("d", F.dayofmonth("fecha")) \
                          .withColumn("trimestre", F.quarter("fecha")) \
                          .withColumn("semestre", F.when(F.col("mes") <= 6, 1).otherwise(2)) \
                          .withColumn("nombre_dia", F.date_format("fecha", "EEEE")) \

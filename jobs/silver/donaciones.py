@@ -173,9 +173,9 @@ def run_silver_donations():
         print(f"   ☣️  Registros en Cuarentena: {count_dirty}")
 
         # E. Generación de Particiones para escritura
-        df_final = df_final.withColumn("anio", F.year("fecha_donacion")) \
-                           .withColumn("mes", F.lpad(F.month("fecha_donacion"), 2, "0")) \
-                           .withColumn("dia", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
+        df_final = df_final.withColumn("y", F.year("fecha_donacion")) \
+                           .withColumn("m", F.lpad(F.month("fecha_donacion"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
 
         # 4. Escritura en Capa Silver y Cuarentena
         # -------------------------------------------------------------------------
@@ -192,7 +192,7 @@ def run_silver_donations():
         (
             df_final.write
             .mode("overwrite")
-            .partitionBy("anio", "mes", "dia")
+            .partitionBy("y", "m", "d")
             .format("parquet")
             .option("compression", "snappy")
             .option("partitionOverwriteMode", "dynamic")
