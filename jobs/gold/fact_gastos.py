@@ -1,7 +1,7 @@
 
 """
 Job Gold: Fact Gastos.
-Lógica: Categorización de business rules sobre strings y métricas.
+Fact table simplificada de gastos.
 """
 import sys
 from pathlib import Path
@@ -21,34 +21,22 @@ def run_gold_fact_gastos():
         
         df = spark.read.option("basePath", silver_gastos).parquet(silver_gastos + "/*")
         
-        # Filtro: Solo pagados
-        df = df.filter(F.lower(F.col("estado")) == "pagado")
-
-        # Categorización por nombre
-        nombre = F.lower(F.col("nombre_gasto"))
-        df_enriched = df.withColumn("tipo_gasto_estandarizado", 
-            F.when(nombre.like("%veterin%"), "Veterinaria")
-             .when(nombre.like("%insumo%"), "Insumos")
-             .when(nombre.like("%transpor%"), "Transporte")
-             .when(nombre.like("%uci%"), "UCI")
-             .otherwise("General")
+        # Fact Table: Métricas de gastos
+        df_fact = df.select(
+            "id_gasto",
+            "id_caso",
+            "id_proveedor",
+            "monto",
+            "fecha_pago",
+            "medio_pago",
+            "descripcion",
+            "created_at",
+            "y", "m", "d"
         )
 
-        # Flag Crítico
-        df_enriched = df_enriched.withColumn("es_gasto_critico", 
-            F.when(nombre.like("%veterin%"), True)
-             .when(nombre.like("%uci%"), True)
-             .otherwise(False)
-        )
-
-        # Métricas
-        df_enriched = df_enriched.withColumn("monto_total_log", F.log1p(F.col("monto"))) \
-                                 .withColumn("recencia_gasto_dias", F.datediff(F.current_date(), F.col("fecha_pago")))
-        
-        # Particionamiento
-        df_final = df_enriched.withColumn("y", F.year("fecha_pago")) \
-                              .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
-                              .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
+        # Métricas calculadas
+        df_final = df_fact.withColumn("monto_log", F.log1p(F.col("monto"))) \
+                          .withColumn("recencia_dias", F.datediff(F.current_date(), F.col("fecha_pago")))
         
         (df_final.write.mode("overwrite")
          .partitionBy("y", "m", "d")

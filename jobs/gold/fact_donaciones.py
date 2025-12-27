@@ -1,14 +1,13 @@
 
 """
 Job Gold: Fact Donaciones.
-Tabla de hechos transaccional con métricas enriquecidas.
+Fact table simplificada de donaciones.
 """
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
+from pyspark.sql import functions as F, Window
 import config
 from jobs.utils.spark_session import get_spark_session
 from jobs.utils.file_utils import rename_spark_output
@@ -24,43 +23,54 @@ def run_gold_fact_donaciones():
         
         df_silver = spark.read.option("basePath", silver_donaciones).parquet(silver_donaciones + "/*")
         
-        # Filtro Global de Fact Table (Solo exitosas pasan a Fact de Ingresos Reales)
-        # SQLX: LOWER(d.estado) IN ('aprobada', 'completada', 'exitoso')
-        df_filtered = df_silver.filter(F.lower(F.col("estado")).isin("aprobada", "completada", "exitoso"))
-
-        # Lógica de Negocio (Idéntica a Dataform)
-        df_enriched = df_filtered.withColumn(
-            "es_donacion_valida", 
-            F.when(F.lower(F.col("estado")) == "aprobada", True).otherwise(False)
-        ).withColumn(
+        # Fact Table: Todas las donaciones sin filtro de estado
+        # Lógica de Negocio
+        df_enriched = df_silver.withColumn(
             "es_donacion_critica", 
             F.when(F.col("monto") > 500000, True).otherwise(False)
         ).withColumn("monto_log", F.log1p(F.col("monto"))) \
          .withColumn("recencia_donacion_dias", F.datediff(F.current_date(), F.col("fecha_donacion"))) \
          .withColumn("anio_mes_donacion", F.date_format("fecha_donacion", "yyyy-MM"))
 
-        # Window para Recencia del Donante (Última donación de ESTE donante)
+        # Window para Recencia del Donante
         window_donante = Window.partitionBy("id_donante")
         df_enriched = df_enriched.withColumn("ultima_fecha_donante", F.max("fecha_donacion").over(window_donante)) \
                                  .withColumn("recencia_donaciones_dias", F.datediff(F.current_date(), F.col("ultima_fecha_donante"))) \
                                  .drop("ultima_fecha_donante")
 
-        # Columnas de partición física para almacenamiento
-        df_final = df_enriched.withColumn("y", F.year("fecha_donacion")) \
-                              .withColumn("m", F.lpad(F.month("fecha_donacion"), 2, "0")) \
-                              .withColumn("d", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
+        # Categorías de monto
+        df_fact = df_enriched.withColumn(
+            "categoria_monto",
+            F.when(F.col("monto") < 50000, "Bajo")
+             .when(F.col("monto") < 200000, "Medio")
+             .otherwise("Alto")
+        )
 
-        # Escritura Particionada
+        # Select final columns
+        df_final = df_fact.select(
+            "id_donacion",
+            "id_donante",
+            "monto",
+            "fecha_donacion",
+            "metodo_pago",
+            "es_donacion_critica",
+            "monto_log",
+            "recencia_donacion_dias",
+            "recencia_donaciones_dias",
+            "anio_mes_donacion",
+            "categoria_monto",
+            "y", "m", "d"
+        )
+
         (df_final.write.mode("overwrite")
          .partitionBy("y", "m", "d")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
          
-        # Renombrar archivos
         rename_spark_output("gold", "fact_donaciones", output_path)
          
         print("✅ Gold Fact Donaciones procesada.")
-        
+
     finally:
         spark.stop()
 
