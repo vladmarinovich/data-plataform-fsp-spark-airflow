@@ -32,14 +32,15 @@ def run_dim_calendario():
                          .withColumn("m", F.month("fecha")) \
                          .withColumn("d", F.dayofmonth("fecha")) \
                          .withColumn("trimestre", F.quarter("fecha")) \
-                         .withColumn("semestre", F.when(F.col("mes") <= 6, 1).otherwise(2)) \
+                         .withColumn("semestre", F.when(F.col("m") <= 6, 1).otherwise(2)) \
                          .withColumn("nombre_dia", F.date_format("fecha", "EEEE")) \
                          .withColumn("nombre_mes", F.date_format("fecha", "MMMM")) \
-                         .withColumn("anio_mes", F.format_string("%d-%02d", F.col("anio"), F.col("mes"))) \
-                         .withColumn("anio_trimestre", F.concat(F.col("anio"), F.lit("-T"), F.col("trimestre"))) \
-                         .withColumn("anio_semestre", F.concat(F.col("anio"), F.lit("-S"), F.col("semestre"))) \
+                         .withColumn("anio_mes", F.format_string("%d-%02d", F.col("y"), F.col("m"))) \
+                         .withColumn("anio_trimestre", F.concat(F.col("y"), F.lit("-T"), F.col("trimestre"))) \
+                         .withColumn("anio_semestre", F.concat(F.col("y"), F.lit("-S"), F.col("semestre"))) \
                          .withColumn("semana_iso", F.weekofyear("fecha")) \
                          .withColumn("es_fin_de_semana", F.when(F.dayofweek("fecha").isin(1, 7), True).otherwise(False))
+
 
         # Escritura
         (df_cal.write.mode("overwrite").parquet(output_path))
