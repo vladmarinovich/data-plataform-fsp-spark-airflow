@@ -16,7 +16,7 @@ def run_silver_casos():
     spark = get_spark_session("SilverCasos")
     try:
         print("🚀 JOB SILVER: CASOS")
-        input_path = f"{config.RAW_PATH}/raw_casos"
+        input_path = f"{config.RAW_PATH}/raw_casos.parquet"
         output_path = f"{config.SILVER_PATH}/casos"
         
         df_raw = spark.read.parquet(input_path)
@@ -67,8 +67,52 @@ def run_silver_casos():
         window_spec = Window.partitionBy("id_caso").orderBy(F.col("last_modified_at").desc())
         df_dedup = df_clean.withColumn("row_num", F.row_number().over(window_spec)).filter(F.col("row_num") == 1).drop("row_num")
 
-        # Particionamiento derivado (Fecha Ingreso)
-        df_final = df_dedup.withColumn("anio", F.year("fecha_ingreso")) \
+        # D. Calidad de Datos (DQ) y Cuarentena
+        # --------------------------------------------------
+        print("🛡️  Validando calidad de casos...")
+        
+        df_dq = df_dedup.withColumn("dq_errors", F.array())
+        
+        # Regla 1: IDs Obligatorios
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when(F.col("id_caso").isNull(), 
+                F.array_union(F.col("dq_errors"), F.array(F.lit("ID_CASO_NULO")))
+            ).otherwise(F.col("dq_errors"))
+        )
+        
+        # Regla 2: Fecha de Ingreso válida (2010 a hoy)
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when((F.col("fecha_ingreso") < F.lit("2010-01-01")) | (F.col("fecha_ingreso") > F.current_timestamp()),
+                F.array_union(F.col("dq_errors"), F.array(F.lit("FECHA_INGRESO_INVALIDA")))
+            ).otherwise(F.col("dq_errors"))
+        )
+
+        # Regla 3: Nombre obligatorio (no puede ser el default 'anonimo')
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when(F.col("nombre_caso") == "anonimo",
+                F.array_union(F.col("dq_errors"), F.array(F.lit("NOMBRE_CASO_NULO")))
+            ).otherwise(F.col("dq_errors"))
+        )
+
+        # Dividimos: Silver vs Cuarentena
+        df_final = df_dq.filter(F.size(F.col("dq_errors")) == 0).drop("dq_errors")
+        df_quarantine = df_dq.filter(F.size(F.col("dq_errors")) > 0)
+        
+        count_silver = df_final.count()
+        count_dirty = df_quarantine.count()
+        
+        print(f"   ✨ Casos Válidos: {count_silver}")
+        print(f"   ☣️  Casos en Cuarentena: {count_dirty}")
+
+        # E. Escritura y Cuarentena
+        if count_dirty > 0:
+            quarantine_path = f"{config.PROJECT_ROOT}/data/quarantine/casos"
+            print(f"☣️  Guardando casos dudosos en: {quarantine_path}")
+            df_quarantine.write.mode("append").parquet(quarantine_path)
+            df_quarantine.select("id_caso", "nombre_caso", "dq_errors").show(truncate=False)
+
+        # Derivar particiones
+        df_final = df_final.withColumn("anio", F.year("fecha_ingreso")) \
                            .withColumn("mes", F.lpad(F.month("fecha_ingreso"), 2, "0")) \
                            .withColumn("dia", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
 

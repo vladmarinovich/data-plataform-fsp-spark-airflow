@@ -50,7 +50,13 @@ def get_spark_session(app_name: str = None) -> SparkSession:
     if config.ENV == "local":
         builder = builder.config("spark.ui.enabled", "false") \
                          .config("spark.driver.bindAddress", "127.0.0.1") \
-                         .config("spark.driver.host", "127.0.0.1")
+                         .config("spark.driver.host", "127.0.0.1") \
+                         .config("spark.sql.shuffle.partitions", "8") \
+                         .config("spark.default.parallelism", "4") \
+                         .config("spark.sql.autoBroadcastJoinThreshold", "10485760") \
+                         .config("spark.sql.adaptive.skewJoin.enabled", "true") \
+                         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+                         .config("spark.kryoserializer.buffer.max", "512m")
 
     spark = builder.getOrCreate()
     

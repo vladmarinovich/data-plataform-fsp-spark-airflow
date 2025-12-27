@@ -46,11 +46,11 @@ if ENV == "local":
     RAW_PATH =    str(Path(LOCAL_LAKE_PATH) / "raw")
     SILVER_PATH = str(Path(LOCAL_LAKE_PATH) / "silver")
     GOLD_PATH =   str(Path(LOCAL_LAKE_PATH) / "gold")
+    QUARANTINE_PATH = str(Path(LOCAL_LAKE_PATH) / "quarantine")
     
     # Asegurar que existan carpetas locales
-    Path(RAW_PATH).mkdir(parents=True, exist_ok=True)
-    Path(SILVER_PATH).mkdir(parents=True, exist_ok=True)
-    Path(GOLD_PATH).mkdir(parents=True, exist_ok=True)
+    for p in [RAW_PATH, SILVER_PATH, GOLD_PATH, QUARANTINE_PATH]:
+        Path(p).mkdir(parents=True, exist_ok=True)
 
 else:
     # --- CONFIGURACIÓN PROD / GCS ---
@@ -59,10 +59,12 @@ else:
     BUCKET_RAW = "salvando-patitas-spark-raw"
     BUCKET_SILVER = "salvando-patitas-spark-silver"
     BUCKET_GOLD = "salvando-patitas-spark-gold"
+    BUCKET_QUARANTINE = "salvando-patitas-spark-quarantine"
     
     RAW_PATH = f"{STORAGE_PROTOCOL}{BUCKET_RAW}"
     SILVER_PATH = f"{STORAGE_PROTOCOL}{BUCKET_SILVER}"
     GOLD_PATH = f"{STORAGE_PROTOCOL}{BUCKET_GOLD}"
+    QUARANTINE_PATH = f"{STORAGE_PROTOCOL}{BUCKET_QUARANTINE}"
 
 # ============================================
 # SUPABASE - Credenciales
@@ -73,10 +75,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 # ============================================
 # SPARK - Configuración
 # ============================================
-SPARK_MASTER = os.getenv("SPARK_MASTER", "local[*]")
+SPARK_MASTER = os.getenv("SPARK_MASTER", "local[2]")
 SPARK_APP_NAME = "CRM-Data-Platform"
-SPARK_DRIVER_MEMORY = os.getenv("SPARK_DRIVER_MEMORY", "2g")
-SPARK_EXECUTOR_MEMORY = os.getenv("SPARK_EXECUTOR_MEMORY", "2g")
+SPARK_DRIVER_MEMORY = os.getenv("SPARK_DRIVER_MEMORY", "3g")
+SPARK_EXECUTOR_MEMORY = os.getenv("SPARK_EXECUTOR_MEMORY", "3g")
 
 # ============================================
 # TABLAS - Configuración de Fuentes de Datos

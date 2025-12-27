@@ -37,7 +37,7 @@ def run_silver_donations():
         print("="*80)
 
         # Path de entrada (Raw) y salida (Silver)
-        input_path = f"{config.RAW_PATH}/raw_donaciones"
+        input_path = f"{config.RAW_PATH}/raw_donaciones.parquet"
         output_path = f"{config.SILVER_PATH}/donaciones"
         
         print(f"📥 Leyendo desde: {input_path}")
@@ -152,6 +152,13 @@ def run_silver_donations():
         df_dq = df_dq.withColumn("dq_errors", 
             F.when(F.col("id_donacion").isNull(),
                 F.array_union(F.col("dq_errors"), F.array(F.lit("ID_NULO")))
+            ).otherwise(F.col("dq_errors"))
+        )
+
+        # Regla 4: Fecha mínima (2010) - Proveniente de Dataform SQLX
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when(F.col("fecha_donacion") < F.lit("2010-01-01"),
+                F.array_union(F.col("dq_errors"), F.array(F.lit("FECHA_ANTERIOR_A_2010")))
             ).otherwise(F.col("dq_errors"))
         )
 

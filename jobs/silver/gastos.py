@@ -16,7 +16,7 @@ def run_silver_gastos():
     spark = get_spark_session("SilverGastos")
     try:
         print("🚀 JOB SILVER: GASTOS")
-        input_path = f"{config.RAW_PATH}/raw_gastos"
+        input_path = f"{config.RAW_PATH}/raw_gastos.parquet"
         output_path = f"{config.SILVER_PATH}/gastos"
         
         df_raw = spark.read.parquet(input_path)
@@ -52,16 +52,7 @@ def run_silver_gastos():
              .when(F.col("medio_pago_clean").like("%tarjeta%"), "tarjeta")
              .otherwise(F.col("medio_pago_clean"))
         ).drop("medio_pago_clean")
-
-        # estado
-        df_clean = df_clean.withColumn("estado_clean", F.lower(F.trim(F.col("estado"))))
-        df_clean = df_clean.withColumn("estado", 
-            F.when(F.col("estado").isNull(), "exitoso")
-             .otherwise(F.col("estado_clean"))
-        ).drop("estado_clean")
         
-        # nombre_gasto (Trim + Lower)
-        df_clean = df_clean.withColumn("nombre_gasto", F.lower(F.trim(F.col("nombre_gasto"))))
 
         # 3. Filtros Duros (Data Quality)
         # Rechazar gastos sin monto o sin proveedor
