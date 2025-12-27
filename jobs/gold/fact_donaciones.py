@@ -52,7 +52,7 @@ def run_gold_fact_donaciones():
             "id_donante",
             "monto",
             "fecha_donacion",
-            "metodo_pago",
+            "medio_pago",  # Fixed: was metodo_pago
             "es_donacion_critica",
             "monto_log",
             "recencia_donacion_dias",
@@ -61,6 +61,7 @@ def run_gold_fact_donaciones():
             "categoria_monto",
             "y", "m", "d"
         )
+
 
         (df_final.write.mode("overwrite")
          .partitionBy("y", "m", "d")
