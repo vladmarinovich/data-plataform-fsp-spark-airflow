@@ -41,8 +41,8 @@ def run_gold_dim_donantes():
         # Seleccionamos cols de calendario para no traer basura
         cal_cols = df_cal.select(
             F.col("fecha"),
-            F.col("anio").alias("anio_creacion"),
-            F.col("mes").alias("mes_creacion"),
+            F.col("y").alias("anio_creacion"),
+            F.col("m").alias("mes_creacion"),
             F.col("anio_mes").alias("anio_mes_creacion"),
             F.col("trimestre").alias("trimestre_creacion"),
             F.col("anio_trimestre").alias("anio_trimestre_creacion"),
@@ -50,6 +50,7 @@ def run_gold_dim_donantes():
             F.col("anio_semestre").alias("anio_semestre_creacion"),
             F.col("semana_iso").alias("semana_creacion")
         )
+
         
         df_final = df_enriched.join(cal_cols, F.to_date(df_enriched.created_at) == cal_cols.fecha, "left") \
                               .drop("fecha") # Drop key redundancy
