@@ -16,7 +16,7 @@ def run_silver_donantes():
     spark = get_spark_session("SilverDonantes")
     try:
         print("🚀 JOB SILVER: DONANTES (MASTER)")
-        input_path = f"{config.RAW_PATH}/raw_donantes"
+        input_path = f"{config.RAW_PATH}/raw_donantes.parquet"
         output_path = f"{config.SILVER_PATH}/donantes"
         
         # Leemos todo raw (Particionado Hive se lee transparente)
@@ -59,12 +59,49 @@ def run_silver_donantes():
         window_spec = Window.partitionBy("id_donante").orderBy(F.col("last_modified_at").desc())
         df_dedup = df_clean.withColumn("row_num", F.row_number().over(window_spec)).filter(F.col("row_num") == 1).drop("row_num")
 
-        # Particionamiento derivado
-        df_final = df_dedup.withColumn("anio", F.year("created_at").cast("string")) \
+        # D. Calidad de Datos (DQ) y Cuarentena
+        # --------------------------------------------------
+        print("🛡️  Validando calidad de donantes...")
+        
+        df_dq = df_dedup.withColumn("dq_errors", F.array())
+        
+        # Regla 1: Email debe tener formato mínimo (contener @)
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when((F.col("correo") != "desconocido") & (~F.col("correo").like("%@%")), 
+                F.array_union(F.col("dq_errors"), F.array(F.lit("EMAIL_INVALIDO")))
+            ).otherwise(F.col("dq_errors"))
+        )
+        
+        # Regla 2: ID de donante no nulo
+        df_dq = df_dq.withColumn("dq_errors", 
+            F.when(F.col("id_donante").isNull(),
+                F.array_union(F.col("dq_errors"), F.array(F.lit("ID_NULO")))
+            ).otherwise(F.col("dq_errors"))
+        )
+
+        # Dividimos: Silver vs Cuarentena
+        df_final = df_dq.filter(F.size(F.col("dq_errors")) == 0).drop("dq_errors")
+        df_quarantine = df_dq.filter(F.size(F.col("dq_errors")) > 0)
+        
+        count_silver = df_final.count()
+        count_dirty = df_quarantine.count()
+        
+        print(f"   ✨ Donantes Válidos: {count_silver}")
+        print(f"   ☣️  Donantes en Cuarentena: {count_dirty}")
+
+        # E. Escritura y Particionamiento
+        if count_dirty > 0:
+            quarantine_path = f"{config.PROJECT_ROOT}/data/quarantine/donantes"
+            print(f"☣️  Guardando donantes sospechosos en: {quarantine_path}")
+            df_quarantine.write.mode("append").parquet(quarantine_path)
+            df_quarantine.select("id_donante", "nombre", "dq_errors").show(truncate=False)
+
+        # Derivar particiones para el DF Final
+        df_final = df_final.withColumn("anio", F.year("created_at").cast("string")) \
                            .withColumn("mes", F.lpad(F.month("created_at"), 2, "0")) \
                            .withColumn("dia", F.lpad(F.dayofmonth("created_at"), 2, "0"))
 
-        # Escritura (Particionado por Fecha de Creación)
+        # Escritura Silver
         (df_final.write.mode("overwrite")
          .partitionBy("anio", "mes", "dia")
          .option("partitionOverwriteMode", "dynamic")

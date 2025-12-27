@@ -24,7 +24,8 @@ with DAG(
     description='Pipeline principal de Salvando Patitas (Local Sandbox)',
     schedule_interval='30 23 * * 0', # Todos los domingos a las 23:30 UTC
     catchup=False,
-    max_active_tasks=32, # Aumentamos para permitir más paralelismo
+    max_active_tasks=4, # Limitamos para evitar sobrecarga de memoria
+    max_active_runs=1,
     tags=['spdp', 'pyspark', 'gold', 'silver'],
 ) as dag:
 
@@ -34,7 +35,7 @@ with DAG(
     def extract_task(table_name):
         return BashOperator(
             task_id=f'extract_{table_name}',
-            bash_command=f"export ENV=local && {PYTHON_BIN} {PROJECT_ROOT}/scripts/generate_mock_data.py {table_name}",
+            bash_command=f"export ENV=local && {PYTHON_BIN} {PROJECT_ROOT}/scripts/quick_mock_data.py {table_name}",
         )
 
     e_donantes = extract_task('donantes')

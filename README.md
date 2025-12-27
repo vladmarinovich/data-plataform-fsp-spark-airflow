@@ -1,130 +1,166 @@
+# 🐾 Salvando Patitas - Data Platform (PySpark + Airflow)
 
-# 🚀 PySpark + GCP Data Platform (Salvando Patitas)
-
-> **Modern Data Platform** diseñada para la ingesta, transformación y análisis de datos de Salvando Patitas, utilizando **Supabase**, **Google Cloud Storage (GCS)**, **BigQuery** y **Apache Spark**.
-
----
-
-## 📋 Tabla de Contenidos
-
-- [Arquitectura](#-arquitectura)
-- [Workflow de Datos](#-workflow-de-datos)
-- [Requisitos Previos](#-requisitos-previos)
-- [Instalación](#-instalación)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Ejecución Capa RAW](#-ejecución-capa-raw)
-- [Variables de Entorno](#-variables-de-entorno)
-
----
+Pipeline de datos cloud-agnostic usando Apache Spark y Apache Airflow para procesamiento ETL de datos de rescate animal.
 
 ## 🏗️ Arquitectura
 
-Este proyecto implementa una arquitectura **Medallion (Bronze/Silver/Gold)** sobre Google Cloud Platform:
+```
+Supabase (Transactional DB) 
+    ↓
+Extract (Pandas - rápido)
+    ↓
+Raw Layer (Parquet)
+    ↓
+Silver Layer (Spark - Data Quality + Transformaciones)
+    ↓
+Gold Layer (Spark - Dimensiones + Hechos + Features)
+    ↓
+BigQuery (Análisis/BI) [TODO]
+```
 
-1.  **Fuente**: Supabase (PostgreSQL).
-2.  **Raw (Bronze)**: Datos crudos en formato **Parquet** almacenados en **GCS**, particionados por `anio/mes/dia`. Expuestos como *External Tables* en **BigQuery**.
-3.  **Silver (En proceso)**: Datos limpios, deduplicados y tipados (Spark Jobs).
-4.  **Gold (En proceso)**: Agregaciones de negocio para dashboards.
+## 📊 Estado Actual
 
----
+### ✅ Funcionando
+- **Extracción**: 6 tablas desde raw mock data (5 segundos)
+- **Silver Layer**: 6 transformations con Data Quality Assertions
+- **Gold Layer**: Dimensiones, Hechos, Features, Dashboards
+- **Orquestación**: Airflow con DAG completo
+- **Cuarentena**: Sistema de quarantine para datos inválidos
 
-## 🔄 Workflow de Datos
+### ⚠️ Issues Conocidos
 
-El pipeline actual cubre la capa RAW completa:
+**Performance Local (Docker + Spark):**
+- **Tiempo actual**: ~27 minutos end-to-end
+- **Tiempo esperado en cloud**: 5-10 minutos
+- **Problema**: Overhead de Spark para datasets pequeños en laptop
 
-1.  **Extracción**: `scripts/extract_from_supabase.py`
-    *   Descarga incremental (usando `watermarks.json`) o Full Load.
-    *   Guarda localmente en `data/raw/*.parquet`.
-2.  **Carga a GCS**: `scripts/upload_to_gcs.py`
-    *   Sube archivos a `gs://salvando-patitas-spark-raw/`.
-    *   Aplica **Particionamiento Hive** (`anio=YYYY/mes=MM/dia=DD`) para tablas transaccionales.
-    *   Convierte tipos críticos (IDs a INT64, Fechas a UTC Microseconds).
-3.  **Definición**: `scripts/create_external_tables.py`
-    *   Crea o actualiza tablas externas en BigQuery (`raw_donaciones`, `raw_casos`, etc.).
-    *   Configura detección de particiones automática.
+**Configuración Actual:**
+- RAM: 8GB Docker
+- Spark Driver: 3GB
+- Spark Executor: 3GB
+- Shuffle Partitions: 8
+- Cores: local[2]
 
----
+### 📝 Optimizaciones Aplicadas
 
-## ✅ Requisitos Previos
+```python
+# jobs/utils/spark_session.py
+.config("spark.sql.shuffle.partitions", "8")  # Default: 200
+.config("spark.default.parallelism", "4")     # Reduce overhead
+.config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+.config("spark.sql.adaptive.enabled", "true")
+```
 
-*   **Python 3.9+**
-*   **Google Cloud SDK** (gcloud) autenticado.
-*   **Cuenta de Servicio GCP** (o credenciales de usuario con permisos de Storage Admin y BigQuery Admin).
+## 🚀 Quick Start
 
----
-
-## 🔧 Instalación
-
-### 1. Clonar y Configurar entorno
-
+### Prerequisitos
 ```bash
-git clone <repo-url>
-cd pyspark-airflow-data-platform
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+docker
+docker-compose
+Python 3.11+
 ```
 
-### 2. Configurar Variables de Entorno
+### Levantar Ambiente Local
+```bash
+# 1. Levantar Airflow + PostgreSQL
+docker compose up -d
 
-Copiar `.env.example` a `.env` y configurar:
+# 2. Acceder a Airflow UI
+open http://localhost:8080
+# Usuario: admin
+# Password: admin
 
-```ini
-# GCP
-GOOGLE_APPLICATION_CREDENTIALS="path/to/credentials.json" # Opcional si usas gcloud auth application-default
-
-# Supabase
-SUPABASE_URL="https://tu-proyecto.supabase.co"
-SUPABASE_KEY="tu-service-role-key"
-
-# Spark
-SPARK_MASTER="local[*]"
+# 3. Trigger DAG manualmente
+# Click en "spdp_data_platform_main" → Trigger
 ```
-
----
 
 ## 📁 Estructura del Proyecto
 
 ```
-pyspark-airflow-data-platform/
-│
-├── config/                  # Configuración central (paths, schemas)
-├── jobs/                    # Spark Jobs (Silver/Gold)
+├── config/              # Configuración global (paths, Spark, etc)
+├── dags/                # Airflow DAGs
+│   └── spdp_main_pipeline.py
+├── jobs/
+│   ├── silver/         # Transformaciones Silver + DQ
+│   ├── gold/           # Agregaciones Gold
+│   └── utils/          # Spark session, helpers
 ├── scripts/
-│   ├── extract_from_supabase.py   # ETL Supabase -> Local
-│   ├── upload_to_gcs.py           # ETL Local -> GCS (Partitioned)
-│   └── create_external_tables.py  # DDL BigQuery External
-├── data/                    # Almacenamiento temporal (gitignored)
-├── logs/                    # Logs de ejecución
-├── requirements.txt         # Dependencias
-└── watermarks.json          # Estado de extracción incremental
+│   ├── quick_mock_data.py      # Generador de datos mock (Pandas)
+│   └── inspect_quarantine.py   # Revisar datos rechazados
+└── data/
+    └── lake/
+        ├── raw/        # Bronze layer (Parquet)
+        ├── silver/     # Silver layer (Parquet)
+        ├── gold/       # Gold layer (Parquet)
+        └── quarantine/ # DQ rejected records
 ```
 
+## 🛡️ Data Quality
+
+Implementado en Silver Layer:
+
+**Donaciones:**
+- Email válido (contiene @)
+- ID no nulo
+- Fecha posterior a 2010
+
+**Casos:**
+- ID no nulo
+- Fecha ingreso válida (2010-hoy)
+- Nombre no default
+
+**Hogares:**
+- Cupo no negativo
+- Tarifa no negativa
+- Nombre obligatorio
+
+Registros que fallan → `data/lake/quarantine/{table}/`
+
+## 🎯 Próximos Pasos Sugeridos
+
+### 1. **Performance** (CRÍTICO)
+- [ ] Evaluar deployment a Google Cloud Dataproc
+- [ ] Considerar dbt para transformaciones simples
+- [ ] Profile Spark jobs para identificar bottlenecks
+
+### 2. **BigQuery Integration**
+- [ ] Agregar carga de Gold → BigQuery
+- [ ] Configurar external tables en GCS
+- [ ] Automatizar schema sync
+
+### 3. **Monitoring**
+- [ ] Agregar métricas de calidad de datos
+- [ ] Dashboard de ejecución en Airflow
+- [ ] Alertas de fallo
+
+## 🤝 Para Reviewers
+
+**Pregunta principal**: 
+> ¿Cómo optimizar tiempos de ejecución para datasets < 1000 registros sin sacrificar la arquitectura Spark/Airflow?
+
+**Contexto**:
+- Objetivo: Pipeline production-ready para portafolio
+- Datasets actuales: 50-200 registros por tabla
+- Growth esperado: 50K+ registros
+- Must-have: Spark (skill requerido para vacantes)
+
+**Áreas de review**:
+1. Configuración de Spark (¿sobrecarga innecesaria?)
+2. Estrategia de particionamiento
+3. Alternativas híbridas (Pandas en local, Spark en cloud)
+4. Arquitectura de DAG (¿dependencias optimizadas?)
+
 ---
 
-## 🚀 Ejecución Capa RAW
+## 📚 Stack Tecnológico
 
-Para actualizar la capa Raw desde cero o incrementalmente:
+- **Orquestación**: Apache Airflow 2.10
+- **Procesamiento**: Apache Spark 3.5 (PySpark)
+- **Storage**: Parquet (columnar)
+- **BD Transaccional**: Supabase (PostgreSQL)
+- **Metadata**: Airflow PostgreSQL
+- **Cloud Target**: Google Cloud (Dataproc + Composer + BigQuery)
 
-```bash
-# 1. Extraer datos nuevos de Supabase
-python scripts/extract_from_supabase.py
+## 📄 Licencia
 
-# 2. Subir y particionar en GCS
-python scripts/upload_to_gcs.py
-
-# 3. Actualizar definiciones en BigQuery (si cambió el schema)
-python scripts/create_external_tables.py
-```
-
----
-
-## 🛡️ Seguridad
-
-*   **NUNCA** subir credenciales al repositorio.
-*   Usar `.env` para secretos locales.
-*   El archivo `watermarks.json` mantiene el estado de la extracción, no borrar a menos que se desee un Full Load.
-
----
-
-**Hecho con 💜 para Salvando Patitas**
+MIT

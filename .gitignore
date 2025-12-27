@@ -18,18 +18,18 @@ webserver_config.py
 standalone_admin_password.txt
 logs/
 plugins/
+airflow-webserver.pid
 
-# Datos (NUNCA SUBIR ESTO)
-data/
-raw/
-silver/
-gold/
-quarantine/
+# Datos (NUNCA SUBIR ESTO) - Especificamos la carpeta /data/
+data/raw/
+data/silver/
+data/gold/
+data/quarantine/
 
-# Docker
+# Referencias y otros
+references/
 .docker/
 
 # OS
 .DS_Store
 Thumbs.db
-references/

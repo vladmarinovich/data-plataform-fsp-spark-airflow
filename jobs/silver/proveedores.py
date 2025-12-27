@@ -16,7 +16,7 @@ def run_silver_proveedores():
     spark = get_spark_session("SilverProveedores")
     try:
         print("🚀 JOB SILVER: PROVEEDORES")
-        input_path = f"{config.RAW_PATH}/raw_proveedores"
+        input_path = f"{config.RAW_PATH}/raw_proveedores.parquet"
         output_path = f"{config.SILVER_PATH}/proveedores"
         
         df_raw = spark.read.parquet(input_path)
