@@ -73,6 +73,7 @@ with DAG(
     g_dim_cal = gold_task('dim_calendario')
     g_dim_don = gold_task('dim_donantes')
     g_dim_casos = gold_task('dim_casos')
+    g_dim_prov = gold_task('dim_proveedores')
     g_fact_don = gold_task('fact_donaciones')
     g_fact_gastos = gold_task('fact_gastos')
 
@@ -122,10 +123,11 @@ with DAG(
     
     [s_donantes, g_dim_cal] >> g_dim_don
     [s_casos, g_dim_cal] >> g_dim_casos
+    s_proveedores >> g_dim_prov
     [s_donaciones, g_dim_cal] >> g_fact_don
     [s_gastos, g_dim_cal] >> g_fact_gastos
     
-    gold_dims = [g_dim_cal, g_dim_don, g_dim_casos]
+    gold_dims = [g_dim_cal, g_dim_don, g_dim_casos, g_dim_prov]
     gold_facts = [g_fact_don, g_fact_gastos]
     
     # CAPA 5: FEATURES (Vienen de DIMS, enriquecidas con FACTS)
@@ -138,8 +140,8 @@ with DAG(
     # feat_donantes viene de dim_donantes + enriquecida con fact_donaciones
     [g_dim_don, g_fact_don] >> g_feat_don
     
-    # feat_proveedores viene de fact_gastos (+ silver_proveedores)
-    [g_fact_gastos, s_proveedores] >> g_feat_prov
+    # feat_proveedores viene de fact_gastos + dim_proveedores
+    [g_fact_gastos, g_dim_prov] >> g_feat_prov
     
     gold_features = [g_feat_don, g_feat_casos, g_feat_prov]
     
@@ -151,8 +153,8 @@ with DAG(
     # dashboard_donaciones: fact_donaciones + feat_donantes + feat_casos
     [g_fact_don, g_feat_don, g_feat_casos] >> g_dash_don
     
-    # dashboard_gastos: fact_gastos + feat_casos + feat_proveedores
-    [g_fact_gastos, g_feat_casos, g_feat_prov] >> g_dash_gastos
+    # dashboard_gastos: fact_gastos + dim_proveedores (+ feat_casos + feat_prov)
+    [g_fact_gastos, g_dim_prov, g_feat_casos, g_feat_prov] >> g_dash_gastos
     
     # dashboard_financiero: CONSOLIDA los otros dos dashboards
     # (hereda calendario de ellos - join por fecha/día)
