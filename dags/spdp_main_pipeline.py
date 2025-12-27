@@ -24,7 +24,7 @@ with DAG(
     description='Pipeline principal de Salvando Patitas (Local Sandbox)',
     schedule_interval='30 23 * * 0', # Todos los domingos a las 23:30 UTC
     catchup=False,
-    max_active_tasks=8,  # Optimizado: permite 8 tasks paralelas (balance RAM/CPU)
+    max_active_tasks=4,  # Balance: suficiente paralelismo sin saturar RAM local
     max_active_runs=1,
     tags=['spdp', 'pyspark', 'gold', 'silver'],
 ) as dag:
