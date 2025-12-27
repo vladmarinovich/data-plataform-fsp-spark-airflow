@@ -18,12 +18,12 @@ def run_gold_feat_proveedores():
         print("🚀 JOB GOLD: FEAT PROVEEDORES")
         
         # Paths
-        dim_proveedores_path = f"{config.GOLD_PATH}/dim_proveedores"
+        silver_proveedores_path = f"{config.SILVER_PATH}/proveedores"
         fact_gastos_path = f"{config.GOLD_PATH}/fact_gastos"
         output_path = f"{config.GOLD_PATH}/feat_proveedores"
         
         # Lectura
-        df_dim_prov = spark.read.parquet(dim_proveedores_path)
+        df_dim_prov = spark.read.parquet(silver_proveedores_path)
         df_fact_gastos = spark.read.parquet(fact_gastos_path)
         
         # Agregaciones
