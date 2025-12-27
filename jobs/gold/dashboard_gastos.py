@@ -67,6 +67,7 @@ def run_gold_dashboard_gastos():
             "monto_minimo_gasto", F.min("monto").over(window_prov)
         ).withColumn(
             "recencia_gasto_dias", F.datediff(F.current_date(), F.col("fecha_pago"))
+        ).withColumn(
             "monto_log", F.log1p(F.col("monto"))
         ).withColumn(
             "categoria_monto",
