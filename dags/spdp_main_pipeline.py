@@ -148,10 +148,10 @@ with DAG(
     # Dashboards parten de fact principal, enriquecidos con features
     # (calendario ya heredado de facts/features - no necesita dependencia explícita)
     
-    # dashboard_donaciones: fact_donaciones + features
-    [g_fact_don, g_feat_casos, g_feat_prov] >> g_dash_don
+    # dashboard_donaciones: fact_donaciones + feat_donantes + feat_casos
+    [g_fact_don, g_feat_don, g_feat_casos] >> g_dash_don
     
-    # dashboard_gastos: fact_gastos + features + proveedores
+    # dashboard_gastos: fact_gastos + feat_casos + feat_proveedores
     [g_fact_gastos, g_feat_casos, g_feat_prov] >> g_dash_gastos
     
     # dashboard_financiero: CONSOLIDA los otros dos dashboards
