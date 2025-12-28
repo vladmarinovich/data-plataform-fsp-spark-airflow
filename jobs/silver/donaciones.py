@@ -37,16 +37,21 @@ def run_silver_donations():
         print("🚀 INICIANDO JOB SILVER: DONACIONES")
         print("="*80)
 
-        # 2. Leer datos Raw desde bucket (Parquet) y filtrar por watermark
+        # 2. Definir paths de entrada (Raw) y salida (Silver)
         input_path = f"{config.RAW_PATH}/raw_donaciones.parquet"
+        output_path = f"{config.SILVER_PATH}/donaciones"
+        
+        # 3. Leer datos Raw desde bucket (Parquet) y filtrar por watermark
         df_raw = spark.read.parquet(input_path)
         watermark = get_watermark(spark)
         if watermark:
             df_raw = df_raw.filter(F.col("last_modified_at") > watermark)
-        # 3. (Opcional) Filtrar solo el mes de prueba si TEST_MONTH está definido
+        
+        # 4. (Opcional) Filtrar solo el mes de prueba si TEST_MONTH está definido
         if config.TEST_MONTH:
             year, month = config.TEST_MONTH.split("-")
             df_raw = df_raw.filter((F.col("y") == int(year)) & (F.col("m") == month))
+        
         print(f"📥 Lectura completada, filas: {df_raw.count()}")
         
         count_raw = df_raw.count()

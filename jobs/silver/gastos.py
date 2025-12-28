@@ -26,6 +26,11 @@ def run_silver_gastos():
         if watermark:
             df_raw = df_raw.filter(F.col("last_modified_at") > watermark)
         
+        # 3. (Opcional) Filtrar solo el mes de prueba si TEST_MONTH está definido
+        if config.TEST_MONTH:
+            year, month = config.TEST_MONTH.split("-")
+            df_raw = df_raw.filter((F.col("y") == int(year)) & (F.col("m") == month))
+        
         print(f"📥 Lectura completada, filas: {df_raw.count()}")
         if df_raw.rdd.isEmpty(): return
 
