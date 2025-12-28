@@ -11,15 +11,22 @@ from pyspark.sql.window import Window
 import config
 from jobs.utils.spark_session import get_spark_session
 from jobs.utils.file_utils import rename_spark_output
+from jobs.utils.watermark import get_watermark, update_watermark
 
 def run_silver_gastos():
     spark = get_spark_session("SilverGastos")
     try:
-        print("🚀 JOB SILVER: GASTOS")
-        input_path = f"{config.RAW_PATH}/raw_gastos.parquet"
+        # Path de entrada (Raw) y salida (Silver)
         output_path = f"{config.SILVER_PATH}/gastos"
         
+        # 2. Leer datos Raw desde bucket (Parquet) y filtrar por watermark
+        input_path = f"{config.RAW_PATH}/raw_gastos.parquet"
         df_raw = spark.read.parquet(input_path)
+        watermark = get_watermark(spark)
+        if watermark:
+            df_raw = df_raw.filter(F.col("last_modified_at") > watermark)
+        
+        print(f"📥 Lectura completada, filas: {df_raw.count()}")
         if df_raw.rdd.isEmpty(): return
 
         # Transformaciones y Reglas de Negocio (Según silver_gastos.sqlx)
@@ -74,11 +81,16 @@ def run_silver_gastos():
 
         # Escritura
         (df_final.write.mode("overwrite").partitionBy("y", "m", "d")
-         .option("partitionOverwriteMode", "dynamic").parquet(output_path))
+          .option("partitionOverwriteMode", "dynamic").parquet(output_path))
         
         # Renombrar archivos al estándar
         rename_spark_output("silver", "gastos", output_path)
-        
+
+        # Update watermark with max last_modified_at processed in this batch
+        max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
+        if max_ts:
+            update_watermark(spark, max_ts)
+
         print("✅ Gastos procesados.")
 
     finally:
