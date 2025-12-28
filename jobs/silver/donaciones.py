@@ -24,6 +24,7 @@ from pyspark.sql.window import Window
 import config
 from jobs.utils.spark_session import get_spark_session
 from jobs.utils.file_utils import rename_spark_output
+from jobs.utils.watermark import get_watermark, update_watermark
 
 def run_silver_donations():
     """Función principal del pipeline Silver de Donaciones."""
@@ -36,15 +37,17 @@ def run_silver_donations():
         print("🚀 INICIANDO JOB SILVER: DONACIONES")
         print("="*80)
 
-        # Path de entrada (Raw) y salida (Silver)
+        # 2. Leer datos Raw desde bucket (Parquet) y filtrar por watermark
         input_path = f"{config.RAW_PATH}/raw_donaciones.parquet"
-        output_path = f"{config.SILVER_PATH}/donaciones"
-        
-        print(f"📥 Leyendo desde: {input_path}")
-        
-        # 2. Leer datos Raw (Schema evolution habilitado)
-        # Spark infiere particiones anio/mes/dia automáticamente
         df_raw = spark.read.parquet(input_path)
+        watermark = get_watermark(spark)
+        if watermark:
+            df_raw = df_raw.filter(F.col("last_modified_at") > watermark)
+        # 3. (Opcional) Filtrar solo el mes de prueba si TEST_MONTH está definido
+        if config.TEST_MONTH:
+            year, month = config.TEST_MONTH.split("-")
+            df_raw = df_raw.filter((F.col("y") == int(year)) & (F.col("m") == month))
+        print(f"📥 Lectura completada, filas: {df_raw.count()}")
         
         count_raw = df_raw.count()
         print(f"   📊 Registros Raw leídos: {count_raw}")
@@ -201,6 +204,11 @@ def run_silver_donations():
         
         # Renombrar archivos al estándar del proyecto
         rename_spark_output("silver", "donaciones", output_path)
+
+        # Update watermark with max last_modified_at processed
+        max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
+        if max_ts:
+            update_watermark(spark, max_ts)
         
         print("✅ Escritura completada exitosamente.")
         print("="*80)

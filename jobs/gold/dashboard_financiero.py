@@ -38,7 +38,7 @@ def run_gold_dashboard_financiero():
             "monto",
             F.lit(False).alias("es_gasto"),
             F.lit(False).alias("sobrepresupuesto"),
-            "tamano_donacion" # categoria_monto
+            "categoria_monto"
         )
         
         df_gas_union = df_gas.select(
