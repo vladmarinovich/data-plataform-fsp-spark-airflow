@@ -61,9 +61,10 @@ def run_gold_dim_donantes():
                            .withColumn("d", F.lpad(F.dayofmonth("created_at"), 2, "0"))
 
         # Escritura
+        print(f"   💾 Escribiendo {df_final.count()} registros a Gold...")
+        
         (df_final.write.mode("overwrite")
          .partitionBy("y", "m", "d")
-         .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
         
         # Renombrar archivos

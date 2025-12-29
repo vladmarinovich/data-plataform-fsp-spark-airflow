@@ -77,17 +77,20 @@ def generate_donaciones():
             monto = -50000.0  # MONTO NEGATIVO (para cuarentena)
         else:
             monto = random.uniform(50000, 500000)
-            
+        # Distribuir en 31 días: tiempo_incremento por registro ~6.5 horas
+        # 31 días = 2,678,400 segundos / 200 registros ≈ 13,392 seg/registro
+        time_increment = i * 13_392 * 1_000_000  # microsegundos
+        
         data.append({
             'id_donacion': i,
             'id_donante': (i % 100) + 1,
             'id_caso': (i % 50) + 1,
-            'fecha_donacion': base_time + (i * 1000000),
+            'fecha_donacion': base_time + time_increment,
             'monto': monto,
             'medio_pago': random.choice(['Tarjeta', 'Transferencia', 'Efectivo']),
             'estado': 'completado',
             'created_at': base_time,
-            'last_modified_at': base_time + (i * 1000000)
+            'last_modified_at': base_time + time_increment
         })
     
     df = pd.DataFrame(data)

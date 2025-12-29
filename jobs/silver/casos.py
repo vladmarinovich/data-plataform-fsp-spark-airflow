@@ -11,27 +11,31 @@ from pyspark.sql.window import Window
 import config
 from jobs.utils.spark_session import get_spark_session
 from jobs.utils.file_utils import rename_spark_output
+from jobs.utils.watermark import get_watermark, update_watermark
 
 def run_silver_casos():
     spark = get_spark_session("SilverCasos")
     try:
         print("🚀 JOB SILVER: CASOS")
-        input_path = f"{config.RAW_PATH}/raw_casos.parquet"
+        input_path = f"{config.RAW_PATH}/casos"
         output_path = f"{config.SILVER_PATH}/casos"
         
-        df_raw = spark.read.parquet(input_path)
-        if df_raw.rdd.isEmpty(): return
+        df_raw = spark.read.option("mergeSchema", "true").parquet(input_path)
+        watermark = get_watermark(spark, "casos")
+        if watermark:
+            df_raw = df_raw.filter(F.col("last_modified_at") > watermark)
+            
+        if df_raw.count() == 0: 
+            print("⚠️ No hay nuevos casos para procesar.")
+            return
 
         # Transformaciones de Negocio (silver_casos.sqlx)
         # -----------------------------------------------
         
         # Casting y Defaults Numéricos (Adaptación Spark Robusta)
         def cast_to_timestamp(col_name):
-            col = F.col(col_name)
-            return F.when(
-                col.cast("string").rlike(r'^\d+$'), 
-                F.from_unixtime(col.cast("long")/1000000).cast("timestamp")
-            ).otherwise(F.to_timestamp(col))
+            """Convierte columna a timestamp. Fechas vienen como STRING ISO desde Supabase."""
+            return F.to_timestamp(F.col(col_name))
 
         df_clean = df_raw.withColumn("id_caso", F.col("id_caso").cast("long")) \
                          .withColumn("id_hogar_de_paso", F.coalesce(F.col("id_hogar_de_paso").cast("long"), F.lit(9))) \
@@ -112,6 +116,11 @@ def run_silver_casos():
             df_quarantine.select("id_caso", "nombre_caso", "dq_errors").show(truncate=False)
 
         # Derivar particiones
+        # Primero eliminamos columnas de partición si existen
+        cols_to_drop = [c for c in ["y", "m", "d"] if c in df_final.columns]
+        if cols_to_drop:
+            df_final = df_final.drop(*cols_to_drop)
+        
         df_final = df_final.withColumn("y", F.year("fecha_ingreso")) \
                            .withColumn("m", F.lpad(F.month("fecha_ingreso"), 2, "0")) \
                            .withColumn("d", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
@@ -121,6 +130,11 @@ def run_silver_casos():
         
         # Renombrar archivos al estándar
         rename_spark_output("silver", "casos", output_path)
+
+        # Update watermark (Disabled - Orchestrator managed)
+        # max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
+        # if max_ts:
+        #     update_watermark(spark, max_ts, "casos")
         
         print("✅ Casos procesados.")
 

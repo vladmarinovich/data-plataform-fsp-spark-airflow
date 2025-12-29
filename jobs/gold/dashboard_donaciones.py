@@ -34,10 +34,11 @@ def run_gold_dashboard_donaciones():
             "left"
         ).select(
             "d.*",
-            F.col("dd.nombre").alias("donante"),
+            F.col("dd.donante").alias("donante"),
             "dd.correo",
             "dd.ciudad", 
-            "dd.pais"
+            "dd.pais",
+            "dd.canal_origen"
         )
         
         # Window specs para RFM

@@ -36,10 +36,37 @@ def get_spark_session(app_name: str = None) -> SparkSession:
         .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
         .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
         
-        # Configuraciones de optimización
+        # Configuraciones de optimización para BAJO CONSUMO DE MEMORIA
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        .config("spark.sql.adaptive.coalescePartitions.minPartitionNum", "1")
         .config("spark.sql.parquet.compression.codec", "snappy")
+        
+        # PARTITION PRUNING - Clave para manejar muchas particiones
+        .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+        .config("spark.sql.hive.metastorePartitionPruning", "true")
+        .config("spark.sql.optimizer.dynamicPartitionPruning.enabled", "true")
+        
+        # AUMENTAR LÍMITES para manejar muchas particiones pequeñas
+        .config("spark.sql.files.maxPartitionBytes", "268435456")  # 256MB (aumentado)
+        .config("spark.sql.files.openCostInBytes", "8388608")      # 8MB (reducido para muchos archivos)
+        .config("spark.sql.files.maxRecordsPerFile", "0")          # Sin límite
+        
+        # Reducir shuffles y paralelismo
+        .config("spark.sql.shuffle.partitions", "4")
+        .config("spark.default.parallelism", "2")
+        
+        # Reducir memoria de broadcast
+        .config("spark.sql.autoBroadcastJoinThreshold", "10485760")  # 10MB
+        .config("spark.sql.adaptive.skewJoin.enabled", "true")
+        
+        # Serialización eficiente
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.kryoserializer.buffer.max", "256m")
+        
+        # IMPORTANTE: Aumentar límite de archivos que Spark puede listar
+        .config("spark.sql.sources.parallelPartitionDiscovery.threshold", "64")
+        .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "4")
         
         # Configuración Warehouse
         .config("spark.sql.warehouse.dir", str(config.PROJECT_ROOT / "spark-warehouse"))
@@ -50,13 +77,7 @@ def get_spark_session(app_name: str = None) -> SparkSession:
     if config.ENV == "local":
         builder = builder.config("spark.ui.enabled", "false") \
                          .config("spark.driver.bindAddress", "127.0.0.1") \
-                         .config("spark.driver.host", "127.0.0.1") \
-                         .config("spark.sql.shuffle.partitions", "8") \
-                         .config("spark.default.parallelism", "4") \
-                         .config("spark.sql.autoBroadcastJoinThreshold", "10485760") \
-                         .config("spark.sql.adaptive.skewJoin.enabled", "true") \
-                         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-                         .config("spark.kryoserializer.buffer.max", "512m")
+                         .config("spark.driver.host", "127.0.0.1")
 
     spark = builder.getOrCreate()
     

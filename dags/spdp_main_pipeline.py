@@ -6,7 +6,7 @@ import os
 
 # Configuración de Rutas (Internas de Docker)
 PROJECT_ROOT = "/opt/airflow"
-PYTHON_BIN = "python3" # Usamos el python del contenedor
+PYTHON_BIN = "python3"  # Usamos el python del contenedor
 
 default_args = {
     'owner': 'Antigravity',
@@ -21,37 +21,35 @@ default_args = {
 with DAG(
     'spdp_data_platform_main',
     default_args=default_args,
-    description='Pipeline principal de Salvando Patitas (Local Sandbox)',
-    schedule_interval='30 23 * * 0', # Todos los domingos a las 23:30 UTC
+    description='Pipeline principal de Salvando Patitas - Producción',
+    schedule_interval='30 23 * * 0',  # Todos los domingos a las 23:30 UTC
     catchup=False,
-    max_active_tasks=4,  # Balance: suficiente paralelismo sin saturar RAM local
+    max_active_tasks=4,
     max_active_runs=1,
-    tags=['spdp', 'pyspark', 'gold', 'silver'],
+    tags=['spdp', 'pyspark', 'gold', 'silver', 'production'],
 ) as dag:
 
     # ---------------------------------------------------------
-    # NIVEL 0: CAPA RAW (EXTRACCIÓN DE DATOS)
+    # NIVEL 0: EXTRACCIÓN DESDE SUPABASE (BRONZE/RAW)
     # ---------------------------------------------------------
-    def raw_task(table_name):
-        return BashOperator(
-            task_id=f'raw_{table_name}',
-            bash_command=f"export ENV=local && {PYTHON_BIN} {PROJECT_ROOT}/scripts/quick_mock_data.py {table_name}",
-        )
+    extract_supabase = BashOperator(
+        task_id='extract_from_supabase',
+        bash_command=f"export ENV=cloud && {PYTHON_BIN} {PROJECT_ROOT}/scripts/extract_from_supabase.py",
+    )
 
-    r_donantes = raw_task('donantes')
-    r_casos = raw_task('casos')
-    r_donaciones = raw_task('donaciones')
-    r_gastos = raw_task('gastos')
-    r_proveedores = raw_task('proveedores')
-    r_hogar = raw_task('hogar_de_paso')
+    # Reparticionamiento por fechas de negocio
+    repartition_raw = BashOperator(
+        task_id='repartition_raw',
+        bash_command=f"export ENV=cloud && {PYTHON_BIN} {PROJECT_ROOT}/scripts/repartition_raw.py",
+    )
 
     # ---------------------------------------------------------
-    # NIVEL 1: CAPA SILVER (LIMPIEZA)
+    # NIVEL 1: CAPA SILVER (LIMPIEZA Y NORMALIZACIÓN)
     # ---------------------------------------------------------
     def silver_task(table_name):
         return BashOperator(
             task_id=f'silver_{table_name}',
-            bash_command=f"export ENV=local && {PYTHON_BIN} {PROJECT_ROOT}/jobs/silver/{table_name}.py",
+            bash_command=f"export ENV=cloud && {PYTHON_BIN} {PROJECT_ROOT}/jobs/silver/{table_name}.py",
         )
 
     s_donantes = silver_task('donantes')
@@ -67,13 +65,14 @@ with DAG(
     def gold_task(job_name):
         return BashOperator(
             task_id=f'gold_{job_name}',
-            bash_command=f"export ENV=local && {PYTHON_BIN} {PROJECT_ROOT}/jobs/gold/{job_name}.py",
+            bash_command=f"export ENV=cloud && {PYTHON_BIN} {PROJECT_ROOT}/jobs/gold/{job_name}.py",
         )
 
     g_dim_cal = gold_task('dim_calendario')
     g_dim_don = gold_task('dim_donantes')
     g_dim_casos = gold_task('dim_casos')
     g_dim_prov = gold_task('dim_proveedores')
+    g_dim_hogar = gold_task('dim_hogar_de_paso')
     g_fact_don = gold_task('fact_donaciones')
     g_fact_gastos = gold_task('fact_gastos')
 
@@ -91,76 +90,97 @@ with DAG(
     g_dash_gastos = gold_task('dashboard_gastos')
     g_dash_fin = gold_task('dashboard_financiero')
 
+    # ---------------------------------------------------------
+    # NIVEL 5: CARGA A BIGQUERY
+    # ---------------------------------------------------------
+    load_to_bigquery = BashOperator(
+        task_id='load_to_bigquery',
+        bash_command=f"export ENV=cloud && {PYTHON_BIN} {PROJECT_ROOT}/scripts/load_to_bigquery.py",
+    )
+
+    # ---------------------------------------------------------
+    # NIVEL 6: ACTUALIZACIÓN DE WATERMARK
+    # ---------------------------------------------------------
+    update_watermark = BashOperator(
+        task_id='update_watermark',
+        bash_command=f"""
+        export ENV=cloud && {PYTHON_BIN} -c "
+import sys
+import json
+import os
+from pathlib import Path
+sys.path.insert(0, '{PROJECT_ROOT}')
+
+from jobs.utils.watermark import update_watermark
+from jobs.utils.spark_session import get_spark_session
+from datetime import datetime
+
+spark = get_spark_session('UpdateWatermark')
+try:
+    # Intentar leer estado del pipeline (Smart Update)
+    state_file = '/tmp/pipeline_state.json'
+    new_watermark = None
+    
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, 'r') as f:
+                state = json.load(f)
+                new_watermark = state.get('next_watermark')
+                print(f'📄 Leído next_watermark desde archivo: {{new_watermark}}')
+        except Exception as e:
+            print(f'⚠️ Error leyendo state file: {{e}}')
+    
+    # Fallback a NOW() si no hay archivo
+    if not new_watermark:
+        new_watermark = datetime.utcnow().isoformat()
+        print(f'⚠️ Usando Fallback (NOW): {{new_watermark}}')
+
+    update_watermark(spark, new_watermark, 'spdp_data_platform_main')
+    print(f'✅ Watermark FINAL actualizado a: {{new_watermark}}')
+finally:
+    spark.stop()
+"
+        """,
+    )
+
     # =========================================================
     # DEFINICIÓN DE DEPENDENCIAS (MODELADO DIMENSIONAL KIMBALL)
     # =========================================================
     
-    # CAPA 1: RAW (Todas en paralelo)
-    # ================================
-    raws = [r_donantes, r_casos, r_donaciones, r_gastos, r_proveedores, r_hogar]
+    # CAPA 0: EXTRACCIÓN Y REPARTICIONAMIENTO
+    # ========================================
+    extract_supabase >> repartition_raw
     
-    # CAPA 2: SILVER (Esperan su raw correspondiente)
-    # ================================================
-    r_donantes >> s_donantes
-    r_casos >> s_casos  
-    r_donaciones >> s_donaciones
-    r_gastos >> s_gastos
-    r_proveedores >> s_proveedores
-    r_hogar >> s_hogar
+    # CAPA 1: SILVER (Esperan reparticionamiento)
+    # ============================================
+    repartition_raw >> [s_donantes, s_casos, s_donaciones, s_gastos, s_proveedores, s_hogar]
     
-    silvers = [s_donantes, s_casos, s_donaciones, s_gastos, s_proveedores, s_hogar]
-    
-    # CAPA 3: DIMENSION CALENDARIO (Base de todo Gold)
-    # ==================================================
+    # CAPA 2: DIMENSION CALENDARIO (Base de todo Gold)
+    # =================================================
     # dim_calendario es PRIMERA tabla Gold (independiente)
-    # Todas las tablas Gold dependen de ella
+    g_dim_cal
     
-    g_dim_cal  # Primera dimensión (no depende de nadie)
-    
-    # CAPA 4: DIMENSIONS + FACTS (Dependen de calendario + Silver)
-    # ==============================================================
-    # Todas las dimensions y facts se conectan a calendario
-    
+    # CAPA 3: DIMENSIONS + FACTS (Dependen de calendario + Silver)
+    # =============================================================
     [s_donantes, g_dim_cal] >> g_dim_don
     [s_casos, g_dim_cal] >> g_dim_casos
     s_proveedores >> g_dim_prov
+    s_hogar >> g_dim_hogar
     [s_donaciones, g_dim_cal] >> g_fact_don
     [s_gastos, g_dim_cal] >> g_fact_gastos
     
-    gold_dims = [g_dim_cal, g_dim_don, g_dim_casos, g_dim_prov]
-    gold_facts = [g_fact_don, g_fact_gastos]
-    
-    # CAPA 5: FEATURES (Vienen de DIMS, enriquecidas con FACTS)
-    # ===========================================================
-    # Features parten de una dimension y se enriquecen con facts
-    
-    # feat_casos viene de dim_casos + enriquecida con facts
+    # CAPA 4: FEATURES (Vienen de DIMS, enriquecidas con FACTS)
+    # ==========================================================
     [g_dim_casos, g_fact_gastos, g_fact_don] >> g_feat_casos
-    
-    # feat_donantes viene de dim_donantes + enriquecida con fact_donaciones
     [g_dim_don, g_fact_don] >> g_feat_don
-    
-    # feat_proveedores viene de fact_gastos + dim_proveedores
     [g_fact_gastos, g_dim_prov] >> g_feat_prov
     
-    gold_features = [g_feat_don, g_feat_casos, g_feat_prov]
-    
-    # CAPA 6: DASHBOARDS (Vienen de FACTS principal + FEATURES)
-    # ===========================================================
-    # Dashboards parten de fact principal, enriquecidos con features
-    # (calendario ya heredado de facts/features - no necesita dependencia explícita)
-    
-    # dashboard_donaciones: fact_donaciones + feat_donantes + feat_casos
+    # CAPA 5: DASHBOARDS (Vienen de FACTS principal + FEATURES)
+    # ==========================================================
     [g_fact_don, g_feat_don, g_feat_casos] >> g_dash_don
-    
-    # dashboard_gastos: fact_gastos + dim_proveedores (+ feat_casos + feat_prov)
     [g_fact_gastos, g_dim_prov, g_feat_casos, g_feat_prov] >> g_dash_gastos
-    
-    # dashboard_financiero: CONSOLIDA los otros dos dashboards
-    # (hereda calendario de ellos - join por fecha/día)
     [g_dash_don, g_dash_gastos] >> g_dash_fin
-
-
-
-
-
+    
+    # CAPA 6: CARGA A BIGQUERY Y WATERMARK
+    # =====================================
+    g_dash_fin >> load_to_bigquery >> update_watermark

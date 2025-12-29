@@ -20,9 +20,9 @@ def run_silver_gastos():
         output_path = f"{config.SILVER_PATH}/gastos"
         
         # 2. Leer datos Raw desde bucket (Parquet) y filtrar por watermark
-        input_path = f"{config.RAW_PATH}/raw_gastos.parquet"
-        df_raw = spark.read.parquet(input_path)
-        watermark = get_watermark(spark)
+        input_path = f"{config.RAW_PATH}/gastos"
+        df_raw = spark.read.option("mergeSchema", "true").parquet(input_path)
+        watermark = get_watermark(spark, "gastos")
         if watermark:
             df_raw = df_raw.filter(F.col("last_modified_at") > watermark)
         
@@ -39,11 +39,8 @@ def run_silver_gastos():
         
         # 1. Casting y Defaults (Adaptación Spark Robusta)
         def cast_to_timestamp(col_name):
-            col = F.col(col_name)
-            return F.when(
-                col.cast("string").rlike(r'^\d+$'), 
-                F.from_unixtime(col.cast("long")/1000000).cast("timestamp")
-            ).otherwise(F.to_timestamp(col))
+            """Convierte columna a timestamp. Fechas vienen como STRING ISO desde Supabase."""
+            return F.to_timestamp(F.col(col_name))
 
         df_clean = df_raw.withColumn("id_gasto", F.col("id_gasto").cast("long")) \
                          .withColumn("id_caso", F.coalesce(F.col("id_caso").cast("long"), F.lit(541))) \
@@ -65,6 +62,13 @@ def run_silver_gastos():
              .otherwise(F.col("medio_pago_clean"))
         ).drop("medio_pago_clean")
         
+        # estado: Normalización robusta
+        df_clean = df_clean.withColumn("estado_raw", F.lower(F.trim(F.col("estado"))))
+        df_clean = df_clean.withColumn("estado", 
+            F.when(F.col("estado_raw").isin(['pagado', 'exitoso', 'completado', 'aprobado']) | F.col("estado").isNull(), "pagado")
+             .otherwise("pendiente")
+        ).drop("estado_raw")
+        
 
         # 3. Filtros Duros (Data Quality)
         # Rechazar gastos sin monto o sin proveedor
@@ -80,7 +84,14 @@ def run_silver_gastos():
         df_dedup = df_clean.withColumn("row_num", F.row_number().over(window_spec)).filter(F.col("row_num") == 1).drop("row_num")
 
         # Particionamiento derivado
-        df_final = df_dedup.withColumn("y", F.year("fecha_pago")) \
+        # Primero eliminamos columnas de partición si existen
+        cols_to_drop = [c for c in ["y", "m", "d"] if c in df_dedup.columns]
+        if cols_to_drop:
+            df_final = df_dedup.drop(*cols_to_drop)
+        else:
+            df_final = df_dedup
+        
+        df_final = df_final.withColumn("y", F.year("fecha_pago")) \
                            .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
                            .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
 
@@ -91,10 +102,10 @@ def run_silver_gastos():
         # Renombrar archivos al estándar
         rename_spark_output("silver", "gastos", output_path)
 
-        # Update watermark with max last_modified_at processed in this batch
-        max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
-        if max_ts:
-            update_watermark(spark, max_ts)
+        # Update watermark disabled (Orchestrator managed)
+        # max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
+        # if max_ts:
+        #     update_watermark(spark, max_ts, "gastos")
 
         print("✅ Gastos procesados.")
 
