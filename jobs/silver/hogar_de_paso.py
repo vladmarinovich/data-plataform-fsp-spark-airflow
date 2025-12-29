@@ -16,7 +16,7 @@ def run_silver_hogar_de_paso():
     spark = get_spark_session("SilverHogar")
     try:
         print("🚀 JOB SILVER: HOGAR DE PASO")
-        input_path = f"{config.RAW_PATH}/raw_hogar_de_paso.parquet"
+        input_path = f"{config.RAW_PATH}/hogar_de_paso"
         output_path = f"{config.SILVER_PATH}/hogar_de_paso"
         
         df_raw = spark.read.parquet(input_path)
@@ -24,7 +24,8 @@ def run_silver_hogar_de_paso():
 
         # Casting Robusto (Hogares a veces no tiene created_at en raw, lo derivemos si falta)
         def cast_to_timestamp(col_name):
-            if col_name not in df_raw.columns: return F.current_timestamp()
+            """Convierte columna a timestamp. Fechas vienen como STRING ISO desde Supabase."""
+            return F.to_timestamp(F.col(col_name))
             col = F.col(col_name)
             return F.when(
                 col.cast("string").rlike(r'^\d+$'), 
@@ -40,8 +41,8 @@ def run_silver_hogar_de_paso():
         # Normalización y Defaults (Basado en SQLX)
         df_clean = df_clean.withColumn("nombre_hogar", F.coalesce(F.upper(F.trim(F.col("nombre_hogar"))), F.lit("SIN NOMBRE"))) \
                            .withColumn("tipo_hogar", F.coalesce(F.trim(F.col("tipo_hogar")), F.lit("temporario"))) \
-                           .withColumn("cupo_maximo", F.coalesce(F.col("capacidad_maxima").cast("int"), F.lit(0))) \
-                           .withColumn("tarifa_diaria", F.coalesce(F.col("costo_mensual").cast("double")/30, F.lit(0.0)))
+                           .withColumn("cupo_maximo", F.coalesce(F.col("cupo_maximo").cast("int"), F.lit(0))) \
+                           .withColumn("tarifa_diaria", F.coalesce(F.col("tarifa_diaria").cast("double"), F.lit(0.0)))
 
         # D. Calidad de Datos (DQ) y Cuarentena
         # --------------------------------------------------

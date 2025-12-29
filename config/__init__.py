@@ -56,15 +56,12 @@ else:
     # --- CONFIGURACIÓN PROD / GCS ---
     print("☁️ MODO: CLOUD (Usando Google Cloud Storage)")
     STORAGE_PROTOCOL = "gs://"
-    BUCKET_RAW = "salvando-patitas-spark-raw"
-    BUCKET_SILVER = "salvando-patitas-spark-silver"
-    BUCKET_GOLD = "salvando-patitas-spark-gold"
-    BUCKET_QUARANTINE = "salvando-patitas-spark-quarantine"
+    BUCKET_NAME = "salvando-patitas-spark"
     
-    RAW_PATH = f"{STORAGE_PROTOCOL}{BUCKET_RAW}"
-    SILVER_PATH = f"{STORAGE_PROTOCOL}{BUCKET_SILVER}"
-    GOLD_PATH = f"{STORAGE_PROTOCOL}{BUCKET_GOLD}"
-    QUARANTINE_PATH = f"{STORAGE_PROTOCOL}{BUCKET_QUARANTINE}"
+    RAW_PATH = f"{STORAGE_PROTOCOL}{BUCKET_NAME}/lake/raw"
+    SILVER_PATH = f"{STORAGE_PROTOCOL}{BUCKET_NAME}/lake/silver"
+    GOLD_PATH = f"{STORAGE_PROTOCOL}{BUCKET_NAME}/lake/gold"
+    QUARANTINE_PATH = f"{STORAGE_PROTOCOL}{BUCKET_NAME}/lake/quarantine"
 
 # ============================================
 # SUPABASE - Credenciales
@@ -210,3 +207,11 @@ MAX_AMOUNT = 100_000_000  # 100 millones
 # ============================================
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ============================================
+# TEST MODE
+# ============================================
+# Set to "YYYY-MM" to process only that month (e.g., "2024-01").
+# Set to None to process all data.
+TEST_MONTH = os.getenv("TEST_MONTH")  # None = procesar toda la data de Supabase
+

@@ -11,44 +11,49 @@ from pyspark.sql.window import Window
 import config
 from jobs.utils.spark_session import get_spark_session
 from jobs.utils.file_utils import rename_spark_output
+from jobs.utils.watermark import get_watermark, update_watermark
 
 def run_silver_donantes():
     spark = get_spark_session("SilverDonantes")
     try:
         print("🚀 JOB SILVER: DONANTES (MASTER)")
-        input_path = f"{config.RAW_PATH}/raw_donantes.parquet"
+        input_path = f"{config.RAW_PATH}/donantes"
         output_path = f"{config.SILVER_PATH}/donantes"
         
-        # Leemos todo raw (Particionado Hive se lee transparente)
-        # Nota: Raw donantes está particionado por fecha actualización.
-        # Aquí consolidamos la ÚLTIMA versión de cada donante.
+        # Leemos raw - Spark usará partition pruning automáticamente
         df_raw = spark.read.parquet(input_path)
-        if df_raw.rdd.isEmpty(): return
+        
+        # Donantes es tabla maestra: procesamos todos los registros
+        # Spark solo leerá las particiones necesarias gracias a partition pruning
+            
+        if df_raw.rdd.isEmpty(): 
+            print("⚠️ No hay donantes para procesar.")
+            return
 
         # Transformaciones de Negocio (silver_donantes.sqlx)
-        # --------------------------------------------------
+        # ... (Resto del código igual) ...
+
         
         # Casting y Defaults (Adaptación Spark Robusta)
         def cast_to_timestamp(col_name):
-            col = F.col(col_name)
-            return F.when(
-                col.cast("string").rlike(r'^\d+$'), 
-                F.from_unixtime(col.cast("long")/1000000).cast("timestamp")
-            ).otherwise(F.to_timestamp(col))
+            """Convierte columna a timestamp. Fechas vienen como STRING ISO desde Supabase."""
+            return F.to_timestamp(F.col(col_name))
 
-        df_clean = df_raw.withColumn("id_donante", F.col("id_donante").cast("long")) \
-                         .withColumn("id_organizacion", F.col("id_organizacion").cast("long"))
+        df_clean = df_raw.withColumn("id_donante", F.col("id_donante").cast("long"))
         
         # Procesar Fechas
         df_clean = df_clean.withColumn("created_at", cast_to_timestamp("created_at")) \
                            .withColumn("last_modified_at", cast_to_timestamp("last_modified_at"))
 
         # Normalización y Defaults (Columnas Reales)
-        df_clean = df_clean.withColumn("nombre", F.coalesce(F.upper(F.trim(F.col("nombre"))), F.lit("ANONIMO"))) \
+        # Mapear 'donante' (raw) a 'donante' (silver)
+        df_clean = df_clean.withColumn("donante", F.coalesce(F.upper(F.trim(F.col("donante"))), F.lit("ANONIMO"))) \
                            .withColumn("correo", F.coalesce(F.lower(F.trim(F.col("correo"))), F.lit("desconocido"))) \
                            .withColumn("telefono", F.coalesce(F.trim(F.col("telefono")), F.lit("nn"))) \
                            .withColumn("ciudad", F.coalesce(F.lower(F.trim(F.col("ciudad"))), F.lit("bogota"))) \
-                           .withColumn("pais", F.coalesce(F.upper(F.trim(F.col("pais"))), F.lit("COLOMBIA")))
+                           .withColumn("pais", F.when(F.col("pais").isNull() | (F.trim(F.col("pais")) == ""), "Colombia")
+                                               .otherwise(F.initcap(F.trim(F.col("pais"))))) \
+                           .withColumn("canal_origen", F.coalesce(F.lower(F.trim(F.col("canal_origen"))), F.lit("desconocido")))
 
         
         # Auditoría
@@ -94,9 +99,15 @@ def run_silver_donantes():
             quarantine_path = f"{config.PROJECT_ROOT}/data/quarantine/donantes"
             print(f"☣️  Guardando donantes sospechosos en: {quarantine_path}")
             df_quarantine.write.mode("append").parquet(quarantine_path)
-            df_quarantine.select("id_donante", "nombre", "dq_errors").show(truncate=False)
+            df_quarantine.select("id_donante", "donante", "dq_errors").show(truncate=False)
 
         # Derivar particiones para el DF Final
+        # Primero eliminamos columnas de partición si existen (vienen del RAW)
+        cols_to_drop = [c for c in ["y", "m", "d"] if c in df_final.columns]
+        if cols_to_drop:
+            df_final = df_final.drop(*cols_to_drop)
+        
+        # Ahora creamos las columnas de partición
         df_final = df_final.withColumn("y", F.year("created_at").cast("string")) \
                            .withColumn("m", F.lpad(F.month("created_at"), 2, "0")) \
                            .withColumn("d", F.lpad(F.dayofmonth("created_at"), 2, "0"))
@@ -109,6 +120,11 @@ def run_silver_donantes():
         
         # Renombrar archivos al estándar
         rename_spark_output("silver", "donantes", output_path)
+
+        # Update watermark (Disabled - Orchestrator managed)
+        # max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
+        # if max_ts:
+        #     update_watermark(spark, max_ts, "donantes")
         
         print("✅ Donantes procesados.")
 

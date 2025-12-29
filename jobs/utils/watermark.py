@@ -1,39 +1,104 @@
-'''Utility for handling a single pipeline watermark stored in a BigQuery control table.'''
+'''Utility for handling the GLOBAL pipeline watermark stored in GCS.
+Uses Python SDK to read/write state to gs://salvando-patitas-spark/state/watermarks.json
+'''
 
 from pyspark.sql import SparkSession
+import json
+import tempfile
+import os
+from datetime import datetime
+from pathlib import Path
 import config
+from config.credentials import get_gcs_client
 
-CONTROL_TABLE = "spdp_control.pipeline_watermark"
+# Global Watermark Key
 PIPELINE_NAME = "spdp_data_platform_main"
 
+# GCS Path
+BUCKET_NAME = "salvando-patitas-spark"
+STATE_BLOB_PATH = "state/watermarks.json"
 
-def get_watermark(spark: SparkSession) -> "datetime | None":
-    """Read the current watermark (max last_modified_at) for the pipeline.
-    Returns None if no entry exists yet.
+
+def _read_from_gcs():
+    """Helper to read JSON from GCS using Python SDK."""
+    try:
+        client = get_gcs_client()
+        bucket = client.bucket(BUCKET_NAME)
+        blob = bucket.blob(STATE_BLOB_PATH)
+        
+        if not blob.exists():
+            print(f"⚠️ Watermark file not found in GCS (gs://{BUCKET_NAME}/{STATE_BLOB_PATH}). Assuming clean slate.")
+            return {}
+        
+        content = blob.download_as_text()
+        return json.loads(content)
+    except json.JSONDecodeError:
+        print(f"⚠️ Corrupt watermark file in GCS.")
+        return {}
+    except Exception as e:
+        print(f"⚠️ Error reading watermark from GCS: {e}")
+        return {}
+
+def _write_to_gcs(data):
+    """Helper to write JSON to GCS using Python SDK."""
+    try:
+        client = get_gcs_client()
+        bucket = client.bucket(BUCKET_NAME)
+        blob = bucket.blob(STATE_BLOB_PATH)
+        
+        # Upload as JSON string
+        blob.upload_from_string(
+            json.dumps(data, indent=2),
+            content_type='application/json'
+        )
+        print(f"☁️  Estado sincronizado a GCS: gs://{BUCKET_NAME}/{STATE_BLOB_PATH}")
+    except Exception as e:
+        print(f"❌ Error escribiendo watermark a GCS: {e}")
+        raise
+
+
+def get_watermark(spark: SparkSession, pipeline_name: str = PIPELINE_NAME) -> "datetime | None":
+    """Read the GLOBAL watermark from GCS.
+    Ignores pipeline_name arg to enforce 'One Global Watermark' policy if needed, 
+    but we keep flexibility to look up keys if they exist in the global object.
+    
+    For this robust implementation: We look for the GLOBAL key always, 
+    unless specific logic overrides.
     """
-    df = (
-        spark.read.format("bigquery")
-        .option("table", CONTROL_TABLE)
-        .load()
-        .filter(f"pipeline_name = '{PIPELINE_NAME}'")
-        .select("watermark")
-        .limit(1)
-    )
-    rows = df.collect()
-    return rows[0]["watermark"] if rows else None
+    # Always read fresh from Cloud
+    data = _read_from_gcs()
+    
+    # Priority: 
+    # 1. Look for global key PIPELINE_NAME (The "One Watermark")
+    # 2. Or fallback to specific key if provided (compatibility)
+    
+    # Strict Global Strategy:
+    watermark_str = data.get(PIPELINE_NAME, {}).get("watermark")
+
+    if watermark_str:
+        return datetime.fromisoformat(watermark_str.replace('Z', '+00:00'))
+    
+    return None
 
 
-def update_watermark(spark: SparkSession, new_watermark):
-    """Upsert the watermark with the latest timestamp.
-    `new_watermark` must be a Python datetime or string compatible with TIMESTAMP.
+def update_watermark(spark: SparkSession, new_watermark, pipeline_name: str = PIPELINE_NAME):
+    """Upsert the GLOBAL watermark to GCS.
+    WARNING: This updates the shared state. 
+    Ideally only called by the Orchestrator/Finalizer.
     """
-    # Use MERGE via Spark SQL (BigQuery connector supports DML)
-    spark.sql(
-        f"""
-        MERGE `{CONTROL_TABLE}` T
-        USING (SELECT '{PIPELINE_NAME}' AS pipeline_name, TIMESTAMP('{new_watermark}') AS watermark) S
-        ON T.pipeline_name = S.pipeline_name
-        WHEN MATCHED THEN UPDATE SET watermark = S.watermark, updated_at = CURRENT_TIMESTAMP()
-        WHEN NOT MATCHED THEN INSERT (pipeline_name, watermark) VALUES (S.pipeline_name, S.watermark)
-        """
-    )
+    data = _read_from_gcs()
+    
+    if isinstance(new_watermark, datetime):
+        watermark_str = new_watermark.isoformat()
+    else:
+        watermark_str = str(new_watermark)
+    
+    # Update Global Key
+    data[PIPELINE_NAME] = {
+        "watermark": watermark_str,
+        "updated_at": datetime.now().isoformat()
+    }
+    
+    _write_to_gcs(data)
+    print(f"✅ GLOBAL Watermark actualizado (GCS): {watermark_str}")
+

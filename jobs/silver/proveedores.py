@@ -16,7 +16,7 @@ def run_silver_proveedores():
     spark = get_spark_session("SilverProveedores")
     try:
         print("🚀 JOB SILVER: PROVEEDORES")
-        input_path = f"{config.RAW_PATH}/raw_proveedores.parquet"
+        input_path = f"{config.RAW_PATH}/proveedores"
         output_path = f"{config.SILVER_PATH}/proveedores"
         
         df_raw = spark.read.parquet(input_path)
@@ -24,11 +24,8 @@ def run_silver_proveedores():
 
         # Casting Robusto
         def cast_to_timestamp(col_name):
-            col = F.col(col_name)
-            return F.when(
-                col.cast("string").rlike(r'^\d+$'), 
-                F.from_unixtime(col.cast("long")/1000000).cast("timestamp")
-            ).otherwise(F.to_timestamp(col))
+            """Convierte columna a timestamp. Fechas vienen como STRING ISO desde Supabase."""
+            return F.to_timestamp(F.col(col_name))
 
         df_clean = df_raw.withColumn("id_proveedor", F.col("id_proveedor").cast("long")) \
                          .withColumn("created_at", cast_to_timestamp("created_at")) \

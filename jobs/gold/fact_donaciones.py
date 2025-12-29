@@ -21,9 +21,10 @@ def run_gold_fact_donaciones():
         silver_donaciones = f"{config.SILVER_PATH}/donaciones"
         output_path = f"{config.GOLD_PATH}/fact_donaciones"
         
-        df_silver = spark.read.option("basePath", silver_donaciones).parquet(silver_donaciones + "/*")
+        df_silver = spark.read.parquet(silver_donaciones)
         
-        # Fact Table: Todas las donaciones sin filtro de estado
+        # Lógica de Negocio: Solo donaciones exitosas (Ya normalizadas en Silver)
+        df_silver = df_silver.filter(F.col("estado") == "completada")
         # Lógica de Negocio
         df_enriched = df_silver.withColumn(
             "es_donacion_critica", 
@@ -52,7 +53,8 @@ def run_gold_fact_donaciones():
             "id_donante",
             "monto",
             "fecha_donacion",
-            "medio_pago",  # Fixed: was metodo_pago
+            "medio_pago",
+            "estado",
             "es_donacion_critica",
             "monto_log",
             "recencia_donacion_dias",

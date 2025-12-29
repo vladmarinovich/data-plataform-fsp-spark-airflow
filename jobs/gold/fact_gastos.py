@@ -19,7 +19,10 @@ def run_gold_fact_gastos():
         silver_gastos = f"{config.SILVER_PATH}/gastos"
         output_path = f"{config.GOLD_PATH}/fact_gastos"
         
-        df = spark.read.option("basePath", silver_gastos).parquet(silver_gastos + "/*")
+        df = spark.read.parquet(silver_gastos)
+        
+        # Lógica de Negocio: Solo gastos efectivamente pagados
+        df = df.filter(F.col("estado") == "pagado")
         
         # Fact Table: Métricas de gastos
         df_fact = df.select(
@@ -29,7 +32,8 @@ def run_gold_fact_gastos():
             "monto",
             "fecha_pago",
             "medio_pago",
-            "descripcion",
+            "estado",
+            F.col("nombre_gasto").alias("descripcion"),
             "created_at",
             "y", "m", "d"
         )
