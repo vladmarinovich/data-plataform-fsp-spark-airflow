@@ -151,6 +151,22 @@ Solución: Migración de gsutil a Python SDK
 Aprendizaje: ADC vs Service Account Keys
 ```
 
+### **Decisiones Arquitectónicas & Trade-offs**
+```
+Estrategia: Carga Híbrida (Hybrid Loading Strategy)
+Problemática: Conflictos de Schema (BigInt vs Double) y actualizaciones complejas.
+
+1. Facts (Donaciones, Gastos):
+   - Método: Incremental puro (Watermark + Append).
+   - Razón: Alto volumen, transaccional, inmutable.
+   - Trade-off: Mayor complejidad técnica (MergeSchema), pero máxima eficiencia y escalabilidad.
+
+2. Dimensions (Casos, Donantes, Proveedores):
+   - Método: Full Load (Snapshot + Overwrite).
+   - Razón: Volumen bajo/medio, cambios frecuentes (SCD Type 1), riesgo de inconsistencia.
+   - Trade-off: Mayor consumo de red (descarga todo), pero garantiza CONSISTENCIA TOTAL (elimina duplicados y errores de schema). Priorizamos calidad sobre eficiencia marginal en dims.
+```
+
 ---
 
 ## 📈 CRECIMIENTO DE HABILIDADES
@@ -340,8 +356,10 @@ Features: 20+ implementadas
 ## 🎯 PRÓXIMOS PASOS
 
 ### **Corto Plazo (Esta Semana)**
-- [ ] Completar ejecución del DAG
+- [ ] Completar ejecución del DAG (Q2)
 - [ ] Validar datos en BigQuery
+- [ ] **Diagramar Arquitectura en Miro (Versión Pro)** 🆕
+- [ ] **Migración a VM (e2-standard-4) + Script Auto-apagado** 🆕
 - [ ] Screenshots para portafolio
 - [ ] Video demo (2-3 minutos)
 

@@ -86,14 +86,14 @@ SPARK_EXECUTOR_MEMORY = os.getenv("SPARK_EXECUTOR_MEMORY", "3g")
 INCREMENTAL_TABLES = {
     "donaciones": "last_modified_at",
     "gastos": "last_modified_at",
-    "donantes": "last_modified_at",
-    "casos": "last_modified_at", # Ahora casos también es incremental
+    "donantes": "created_at",
 }
 
 # Tablas snapshot (Full overwrite - sin last_modified_at o muy pocos registros)
 FULL_LOAD_TABLES = [
     "proveedores",  # ~60 registros, snapshot puro
     "hogar_de_paso",  # ~8 registros, snapshot puro (sin last_modified_at)
+    "casos",    # Dimensión maestra (~200 registros), mejor full load para evitar desfaces
 ]
 
 # ============================================

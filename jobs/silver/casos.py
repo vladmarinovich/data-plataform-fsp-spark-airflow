@@ -126,7 +126,7 @@ def run_silver_casos():
                            .withColumn("d", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
 
         (df_final.write.mode("overwrite").partitionBy("y", "m", "d")
-         .option("partitionOverwriteMode", "dynamic").parquet(output_path))
+         .parquet(output_path))
         
         # Renombrar archivos al estándar
         rename_spark_output("silver", "casos", output_path)
