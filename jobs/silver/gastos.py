@@ -93,11 +93,10 @@ def run_silver_gastos():
         
         df_final = df_final.withColumn("y", F.year("fecha_pago")) \
                            .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
-                           .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0")) \
                            .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
 
         # Escritura
-        (df_final.write.mode("overwrite").partitionBy("y", "m", "d")
+        (df_final.write.mode("append").partitionBy("y", "m")
           .option("partitionOverwriteMode", "dynamic").parquet(output_path))
         
         # Renombrar archivos al estándar
