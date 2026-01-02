@@ -34,13 +34,22 @@ def run_gold_fact_gastos():
             "medio_pago",
             "estado",
             F.col("nombre_gasto").alias("descripcion"),
-            "created_at",
-            "y", "m", "d"
+            "created_at"
         )
+        
+        # Derivar columnas de partición desde fecha_pago (Silver ya no las incluye)
+        df_fact = df_fact.withColumn("y", F.year("fecha_pago")) \
+                         .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
+                         .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
 
-        # Métricas calculadas
+        # Métricas calculadas + selección final
         df_final = df_fact.withColumn("monto_log", F.log1p(F.col("monto"))) \
-                          .withColumn("recencia_dias", F.datediff(F.current_date(), F.col("fecha_pago")))
+                          .withColumn("recencia_dias", F.datediff(F.current_date(), F.col("fecha_pago"))) \
+                          .select(
+                              "id_gasto", "id_caso", "id_proveedor", "monto", "fecha_pago",
+                              "medio_pago", "estado", "descripcion", "created_at",
+                              "monto_log", "recencia_dias", "y", "m", "d"
+                          )
         
         (df_final.write.mode("overwrite")
          .partitionBy("y", "m", "d")
@@ -48,7 +57,7 @@ def run_gold_fact_gastos():
          .parquet(output_path))
          
         # Renombrar archivos
-        rename_spark_output("gold", "fact_gastos", output_path)
+        # rename_spark_output("gold", "fact_gastos", output_path)
          
         print("✅ Gold Fact Gastos procesada.")
 
