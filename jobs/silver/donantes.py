@@ -111,11 +111,14 @@ def run_silver_donantes():
             df_final = df_final.drop(*cols_to_drop)
         
         # Ahora creamos las columnas de partición
-        # No derivamos particiones físicas para tablas pequeñas (Dimensiones)
-        # Esto evita generar miles de archivos pequeños en GCS (overhead de rename/listado)
+        # Agregamos particionamiento mensual (y, m) y columna de día para pruning (consistencia con Facts)
+        df_final = df_final.withColumn("y", F.year("created_at")) \
+                           .withColumn("m", F.lpad(F.month("created_at"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("created_at"), 2, "0"))
 
         # Escritura Silver
         (df_final.write.mode("overwrite")
+         .partitionBy("y", "m")
          .parquet(output_path))
         
         # Renombrar archivos al estándar

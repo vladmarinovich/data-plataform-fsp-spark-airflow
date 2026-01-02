@@ -66,6 +66,8 @@ services:
       - ENV=cloud
       - SPARK_DRIVER_MEMORY=2g
       - SPARK_EXECUTOR_MEMORY=4g
+      - AIRFLOW__CORE__PARALLELISM=2
+      - AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG=2
     command: scheduler
 
   airflow-webserver:
