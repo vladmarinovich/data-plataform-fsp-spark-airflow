@@ -157,25 +157,21 @@ def extract_table(
     from datetime import datetime, timedelta
     
     # Calcular fecha límite superior (watermark + 3 meses)
+    # [MODIFICADO] Se eliminan límites trimestrales para permitir carga histórica completa
+    # El manejo de memoria depende de la paginación y del DataFrame final.
     if watermark and not is_snapshot:
-        watermark_date = datetime.fromisoformat(watermark.replace('Z', '+00:00'))
-        max_date = watermark_date + timedelta(days=90)  # ~3 meses
-        max_date_str = max_date.isoformat()
-        print(f"   📅 Límite trimestral (Incremental): {watermark} → {max_date_str} (Q{(watermark_date.month-1)//3 + 1} -> Q{(max_date.month-1)//3 + 1})")
+        # Aquí podrías reactivar una ventana deslizante si quisieras, 
+        # pero por ahora dejamos que traiga todo lo nuevo hasta HOY.
+        pass 
+        
     elif not is_snapshot:
-        # Si NO hay watermark (Carga Inicial), forzar carga solo del primer trimestre (Q1 2023)
-        # para evitar sobrecarga de memoria y particiones.
-        print(f"   🚀 Detectada Carga Inicial (Clean Slate). Limitando a Q1 2023.")
-        
-        # Definir inicio ficticio para Q1 2023
-        start_date_q1 = datetime(2023, 1, 1)
-        watermark = start_date_q1.isoformat() # Usamos esto para el filtro gte
-        
-        max_date = start_date_q1 + timedelta(days=90) # Hasta ~abril 2023
-        max_date_str = max_date.isoformat()
-        print(f"   📅 Límite Carga Inicial: {watermark} → {max_date_str} (Q1 2023)")
-    else:
-        max_date_str = None
+        # Carga Inicial (Clean Slate)
+        print(f"   🚀 Detectada Carga Inicial (Clean Slate). Extrayendo TODO el histórico.")
+        # Se eliminaron las restricciones de Q1 2023
+        pass
+
+    # No hay límite superior forzado
+    max_date_str = None
     
     try:
         while True:

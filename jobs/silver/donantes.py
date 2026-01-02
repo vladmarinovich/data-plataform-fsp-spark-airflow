@@ -88,6 +88,9 @@ def run_silver_donantes():
         df_final = df_dq.filter(F.size(F.col("dq_errors")) == 0).drop("dq_errors")
         df_quarantine = df_dq.filter(F.size(F.col("dq_errors")) > 0)
         
+        # Cacheamos el DF final porque lo usamos para contar y luego para escribir
+        df_final.cache()
+        
         count_silver = df_final.count()
         count_dirty = df_quarantine.count()
         
