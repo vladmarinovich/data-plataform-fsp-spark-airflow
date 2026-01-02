@@ -99,8 +99,8 @@ def run_silver_gastos():
         (df_final.write.mode("append").partitionBy("y", "m")
           .option("partitionOverwriteMode", "dynamic").parquet(output_path))
         
-        # Renombrar archivos al estándar
-        rename_spark_output("silver", "gastos", output_path)
+        # Renombrar archivos al estándar (DESACTIVADO)
+        # rename_spark_output("silver", "gastos", output_path)
 
         # Update watermark disabled (Orchestrator managed)
         # max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
