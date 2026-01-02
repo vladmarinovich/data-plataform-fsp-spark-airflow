@@ -47,6 +47,11 @@ def run_gold_fact_donaciones():
              .otherwise("Alto")
         )
 
+        # Derivar columnas de partición desde fecha_donacion (Silver ya no las incluye)
+        df_fact = df_fact.withColumn("y", F.year("fecha_donacion")) \
+                         .withColumn("m", F.lpad(F.month("fecha_donacion"), 2, "0")) \
+                         .withColumn("d", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
+
         # Select final columns
         df_final = df_fact.select(
             "id_donacion",
@@ -70,7 +75,7 @@ def run_gold_fact_donaciones():
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
          
-        rename_spark_output("gold", "fact_donaciones", output_path)
+        # rename_spark_output("gold", "fact_donaciones", output_path)
          
         print("✅ Gold Fact Donaciones procesada.")
 
