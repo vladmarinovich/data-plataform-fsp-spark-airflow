@@ -110,15 +110,12 @@ def run_silver_donantes():
         if cols_to_drop:
             df_final = df_final.drop(*cols_to_drop)
         
-        # Ahora creamos las columnas de partición
-        # Agregamos particionamiento mensual (y, m) y columna de día para pruning (consistencia con Facts)
-        df_final = df_final.withColumn("y", F.year("created_at")) \
-                           .withColumn("m", F.lpad(F.month("created_at"), 2, "0")) \
-                           .withColumn("d", F.lpad(F.dayofmonth("created_at"), 2, "0"))
-
-        # Escritura Silver
+        
+        # Escritura Silver: Snapshot completo sin particiones
+        # Razón: 11k registros (~5MB) + Full Overwrite + 36+ meses históricos
+        #        = 108+ operaciones GCS (listar+borrar+escribir cada mes) → LENTO
+        # Sin particiones: 1 operación → Instantáneo ⚡
         (df_final.write.mode("overwrite")
-         .partitionBy("y", "m")
          .parquet(output_path))
         
         # Renombrar archivos al estándar (DESACTIVADO para rendimiento GCS)
