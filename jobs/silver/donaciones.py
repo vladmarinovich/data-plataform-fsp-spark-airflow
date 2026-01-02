@@ -188,9 +188,9 @@ def run_silver_donations():
             df_final = df_final.drop(*cols_to_drop)
         
         # Ahora creamos las columnas de partición
-        df_final = df_final.withColumn("y", F.year("fecha_pago")) \
-                           .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
-                           .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))       # A. Escribir Cuarentena (si hay datos sucios)
+        df_final = df_final.withColumn("y", F.year("fecha_donacion")) \
+                           .withColumn("m", F.lpad(F.month("fecha_donacion"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))       # A. Escribir Cuarentena (si hay datos sucios)
         if count_dirty > 0:
             quarantine_path = f"{config.PROJECT_ROOT}/data/quarantine/donaciones"
             print(f"☣️  Guardando datos sucios en: {quarantine_path}")
