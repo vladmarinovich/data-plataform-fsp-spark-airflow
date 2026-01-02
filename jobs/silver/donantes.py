@@ -121,8 +121,8 @@ def run_silver_donantes():
          .partitionBy("y", "m")
          .parquet(output_path))
         
-        # Renombrar archivos al estándar
-        rename_spark_output("silver", "donantes", output_path)
+        # Renombrar archivos al estándar (DESACTIVADO para rendimiento GCS)
+        # rename_spark_output("silver", "donantes", output_path)
 
         # Update watermark (Disabled - Orchestrator managed)
         # max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
