@@ -14,9 +14,15 @@ def rename_spark_output(layer: str, table_name: str, output_path: str):
     """
     print(f"🏷️  Renombrando archivos en {output_path}...")
     
+    if config.ENV == "cloud" and output_path.startswith("gs://"):
+        print("☁️  ENV=cloud: Saltando renombrado de archivos para optimizar I/O.")
+        return
+
     if config.ENV == "local" or not output_path.startswith("gs://"):
         _rename_local(layer, table_name, output_path)
     else:
+        # Solo renombrar en GCS si NO estamos en entorno Cloud optimizado (o para debatir si mantenerlo)
+        # Por ahora lo mantenemos si alguien lo corre manualmente fuera de la VM
         _rename_gcs(layer, table_name, output_path)
 
 def _rename_local(layer: str, table_name: str, output_path: str):

@@ -38,6 +38,8 @@ def send_slack_alert(context, status='failed'):
 
     # Construir el mensaje (Block Kit simplificado para Webhooks)
     payload = {
+        "username": "SPDP Data Platform | Airflow",
+        "icon_emoji": ":sparkles:",  # O usa icon_url si prefieres
         "text": f"{emoji} {title}: {dag_id}.{task_id}",
         "blocks": [
             {
