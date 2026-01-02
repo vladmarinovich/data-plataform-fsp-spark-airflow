@@ -210,8 +210,8 @@ def run_silver_donations():
             .save(output_path)
         )
         
-        # Renombrar archivos al estándar del proyecto
-        rename_spark_output("silver", "donaciones", output_path)
+        # Renombrar archivos al estándar (DESACTIVADO)
+        # rename_spark_output("silver", "donaciones", output_path)
 
         # Update watermark logic disabled inside job (Orchestrator handles state)
         # max_ts = df_final.agg(F.max("last_modified_at")).collect()[0][0]
