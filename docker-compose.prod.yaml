@@ -58,16 +58,30 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+
+      # ===================================================================
+      # CONTROL DE RECURSOS (Tuned para VM de 16GB RAM)
+      # ===================================================================
+      # Configuración actual: 2 jobs concurrentes, 6GB c/u = 12GB máx.
+      # - Deja 4GB libres para OS + Postgres + Webserver
+      # - Prioriza ESTABILIDAD sobre velocidad
+      #
+      # ⚙️  AJUSTE RECOMENDADO según volumen de datos:
+      # - Dataset actual (~30k registros): PARALLELISM=2 (configuración óptima)
+      # - Dataset 10x mayor (300k+): Considerar PARALLELISM=3 + EXECUTOR_MEMORY=3g
+      # - Dataset 100x mayor: Migrar a VM de 32GB + PARALLELISM=4
+      # ===================================================================
       - AIRFLOW__CORE__PARALLELISM=2
       - AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG=2
+
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
       - ENV=cloud
+
+      # Memoria Spark por Job (Driver + Executor = 6GB total)
       - SPARK_DRIVER_MEMORY=2g
       - SPARK_EXECUTOR_MEMORY=4g
-      - AIRFLOW__CORE__PARALLELISM=2
-      - AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG=2
     command: scheduler
 
   airflow-webserver:
