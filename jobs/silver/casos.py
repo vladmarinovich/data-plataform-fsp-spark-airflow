@@ -121,11 +121,10 @@ def run_silver_casos():
         if cols_to_drop:
             df_final = df_final.drop(*cols_to_drop)
         
-        df_final = df_final.withColumn("y", F.year("fecha_ingreso")) \
-                           .withColumn("m", F.lpad(F.month("fecha_ingreso"), 2, "0")) \
-                           .withColumn("d", F.lpad(F.dayofmonth("fecha_ingreso"), 2, "0"))
+        # No derivamos particiones físicas para tablas pequeñas (Dimensiones)
+        # Esto evita generar miles de archivos pequeños en GCS (overhead de rename/listado)
 
-        (df_final.write.mode("overwrite").partitionBy("y", "m", "d")
+        (df_final.write.mode("overwrite")
          .parquet(output_path))
         
         # Renombrar archivos al estándar
