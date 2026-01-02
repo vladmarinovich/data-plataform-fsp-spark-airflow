@@ -93,6 +93,7 @@ def run_silver_gastos():
         
         df_final = df_final.withColumn("y", F.year("fecha_pago")) \
                            .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
+                           .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0")) \
                            .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
 
         # Escritura

@@ -52,21 +52,21 @@ def get_spark_session(app_name: str = None) -> SparkSession:
         .config("spark.sql.files.openCostInBytes", "8388608")      # 8MB (reducido para muchos archivos)
         .config("spark.sql.files.maxRecordsPerFile", "0")          # Sin límite
         
-        # Reducir shuffles y paralelismo
-        .config("spark.sql.shuffle.partitions", "4")
-        .config("spark.default.parallelism", "2")
+        # Optimización para 4 Cores y ~50k-500k registros (Parallelism = Cores * 2)
+        .config("spark.sql.shuffle.partitions", "16")
+        .config("spark.default.parallelism", "8")
         
-        # Reducir memoria de broadcast
-        .config("spark.sql.autoBroadcastJoinThreshold", "10485760")  # 10MB
+        # Aumentar memoria de broadcast (20MB) para dimensiones pequeñas
+        .config("spark.sql.autoBroadcastJoinThreshold", "20971520")  # 20MB
         .config("spark.sql.adaptive.skewJoin.enabled", "true")
         
         # Serialización eficiente
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         .config("spark.kryoserializer.buffer.max", "256m")
         
-        # IMPORTANTE: Aumentar límite de archivos que Spark puede listar
-        .config("spark.sql.sources.parallelPartitionDiscovery.threshold", "64")
-        .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "4")
+        # IMPORTANTE: Aumentar límite de listado paralelo para muchas particiones diarias
+        .config("spark.sql.sources.parallelPartitionDiscovery.threshold", "32")
+        .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "8")
         
         # Configuración Warehouse
         .config("spark.sql.warehouse.dir", str(config.PROJECT_ROOT / "spark-warehouse"))
