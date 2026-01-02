@@ -22,7 +22,7 @@ services:
       - postgres-db-volume:/var/lib/postgresql/data
 
   airflow-setup:
-    build: .
+    image: vmarinovich/spdp-data-platform:latest
     depends_on:
       - postgres
     deploy:
@@ -31,17 +31,17 @@ services:
           memory: 512M
     volumes:
       - .:/opt/airflow
-      - ~/.config/gcloud:/home/airflow/.config/gcloud:ro
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - GOOGLE_APPLICATION_CREDENTIALS=/home/airflow/.config/gcloud/application_default_credentials.json
+      # Nota: En Cloud usamos Identity Service Account, no archivo JSON
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     entrypoint: >
       bash -c "airflow db init && airflow users create --username admin --firstname Vlad --lastname Marinovich --role Admin --email admin@spdp.com --password admin || true"
 
   airflow-scheduler:
-    build: .
+    image: vmarinovich/spdp-data-platform:latest
     restart: always
     depends_on:
       postgres:
@@ -54,7 +54,6 @@ services:
           memory: 1536M
     volumes:
       - .:/opt/airflow
-      - ~/.config/gcloud:/home/airflow/.config/gcloud:ro
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -63,15 +62,14 @@ services:
       - AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG=2
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - GOOGLE_APPLICATION_CREDENTIALS=/home/airflow/.config/gcloud/application_default_credentials.json
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
       - ENV=cloud
-      # Configuración de Spark para bajo consumo de memoria
       - SPARK_DRIVER_MEMORY=1g
       - SPARK_EXECUTOR_MEMORY=1g
     command: scheduler
 
   airflow-webserver:
-    build: .
+    image: vmarinovich/spdp-data-platform:latest
     restart: always
     depends_on:
       postgres:
@@ -84,7 +82,6 @@ services:
           memory: 1024M
     volumes:
       - .:/opt/airflow
-      - ~/.config/gcloud:/home/airflow/.config/gcloud:ro
     ports:
       - "8080:8080"
     environment:
@@ -97,7 +94,7 @@ services:
       - AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT=600
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - GOOGLE_APPLICATION_CREDENTIALS=/home/airflow/.config/gcloud/application_default_credentials.json
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
       - ENV=cloud
     command: webserver
 

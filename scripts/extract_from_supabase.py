@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 from supabase import create_client, Client
 import config
+from config import FULL_LOAD_TABLES
 # Importar utilidades de GCS
 from jobs.utils.watermark import _read_from_gcs, PIPELINE_NAME as GLOBAL_PIPELINE_NAME
 
@@ -375,14 +376,23 @@ def extract_all_tables(client: Client, watermarks: dict) -> dict:
     
     for table_name in ALL_TABLES:
         
-        # Usar el watermark global para todos
-        current_watermark = global_watermark
+        # Lógica Híbrida:
+        # 1. Si es tabla FULL LOAD (Dimensiones), ignorar watermark -> Overwrite Raw
+        # 2. Si es tabla INCREMENTAL (Hechos), usar Global Watermark -> Append Raw
+        
+        if table_name in FULL_LOAD_TABLES:
+            print(f"🔄 Tabla {table_name} es FULL LOAD. Ignorando watermark.")
+            current_watermark = None
+        else:
+            current_watermark = global_watermark
         
         # Extraer datos
         df = extract_table(client, table_name, current_watermark)
         
         if not df.empty:
             # Determinar modo de escritura
+            # Si current_watermark es None (Full Load) -> Overwrite
+            # Si hay watermark (Incremental) -> Append
             mode = "append" if current_watermark else "overwrite"
             
             # Escribir a Bronze

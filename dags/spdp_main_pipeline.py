@@ -3,6 +3,11 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 import os
+import sys
+
+# Importar alertas (Asegurando que el path sea visible)
+sys.path.insert(0, '/opt/airflow')
+from jobs.utils.alerts import slack_failure_callback
 
 # Configuración de Rutas (Internas de Docker)
 PROJECT_ROOT = "/opt/airflow"
@@ -16,6 +21,7 @@ default_args = {
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': slack_failure_callback, # 🔔 Alerta automática
 }
 
 with DAG(
@@ -183,4 +189,18 @@ finally:
     
     # CAPA 6: CARGA A BIGQUERY Y WATERMARK
     # =====================================
+    # =====================================
     g_dash_fin >> load_to_bigquery >> update_watermark
+
+    # ---------------------------------------------------------
+    # NIVEL 7: AUTO-APAGADO (COST SAVING)
+    # ---------------------------------------------------------
+    # Solo apagar si estamos en entorno CLOUD
+    if os.getenv('ENV') == 'cloud':
+        stop_instance = BashOperator(
+            task_id='stop_instance',
+            bash_command="gcloud compute instances stop airflow-server-prod --zone=us-central1-a --quiet",
+            trigger_rule='all_success'  # Solo apagar si TODO salió bien (para poder debuggear si falla)
+        )
+        update_watermark >> stop_instance
+

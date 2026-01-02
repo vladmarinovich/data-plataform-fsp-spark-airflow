@@ -115,7 +115,6 @@ def run_silver_donantes():
         # Escritura Silver
         (df_final.write.mode("overwrite")
          .partitionBy("y", "m", "d")
-         .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
         
         # Renombrar archivos al estándar
