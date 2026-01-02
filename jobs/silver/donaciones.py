@@ -202,7 +202,7 @@ def run_silver_donations():
         
         (
             df_final.write
-            .mode("overwrite")
+            .mode("append") # Append para acumular ficheros diarios en la carpeta mensual
             .partitionBy("y", "m")
             .format("parquet")
             .option("compression", "snappy")
