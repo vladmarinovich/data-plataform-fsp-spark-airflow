@@ -55,21 +55,20 @@ def run_gold_dim_donantes():
         df_final = df_enriched.join(cal_cols, F.to_date(df_enriched.created_at) == cal_cols.fecha, "left") \
                               .drop("fecha") # Drop key redundancy
 
-        # Particionado para el Lake (Mandatory)
+        # Particionado MENSUAL para el Lake (consistencia con Silver)
         df_final = df_final.withColumn("y", F.year("created_at").cast("string")) \
-                           .withColumn("m", F.lpad(F.month("created_at"), 2, "0")) \
-                           .withColumn("d", F.lpad(F.dayofmonth("created_at"), 2, "0"))
+                           .withColumn("m", F.lpad(F.month("created_at"), 2, "0"))
 
         # Escritura
         print(f"   💾 Escribiendo {df_final.count()} registros a Gold...")
         
         (df_final.write.mode("overwrite")
-         .partitionBy("y", "m", "d")
+         .partitionBy("y", "m")
          .parquet(output_path))
         
-        # Renombrar archivos
-        from jobs.utils.file_utils import rename_spark_output
-        rename_spark_output("gold", "dim_donantes", output_path)
+        # Renombrado desactivado para rendimiento GCS
+        # from jobs.utils.file_utils import rename_spark_output
+        # rename_spark_output("gold", "dim_donantes", output_path)
         
         print("✅ Gold Dim Donantes procesada.")
         
