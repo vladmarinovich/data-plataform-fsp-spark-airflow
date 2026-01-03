@@ -38,9 +38,9 @@ def run_gold_fact_gastos():
         )
         
         # Derivar columnas de partición desde fecha_pago (Silver ya no las incluye)
+        # Gold usa particionamiento MENSUAL (y/m) para consistencia con Silver
         df_fact = df_fact.withColumn("y", F.year("fecha_pago")) \
-                         .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0")) \
-                         .withColumn("d", F.lpad(F.dayofmonth("fecha_pago"), 2, "0"))
+                         .withColumn("m", F.lpad(F.month("fecha_pago"), 2, "0"))
 
         # Métricas calculadas + selección final
         df_final = df_fact.withColumn("monto_log", F.log1p(F.col("monto"))) \
@@ -48,11 +48,11 @@ def run_gold_fact_gastos():
                           .select(
                               "id_gasto", "id_caso", "id_proveedor", "monto", "fecha_pago",
                               "medio_pago", "estado", "descripcion", "created_at",
-                              "monto_log", "recencia_dias", "y", "m", "d"
+                              "monto_log", "recencia_dias", "y", "m"
                           )
         
         (df_final.write.mode("overwrite")
-         .partitionBy("y", "m", "d")
+         .partitionBy("y", "m")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
          

@@ -48,9 +48,9 @@ def run_gold_fact_donaciones():
         )
 
         # Derivar columnas de partición desde fecha_donacion (Silver ya no las incluye)
+        # Gold usa particionamiento MENSUAL (y/m) para consistencia con Silver
         df_fact = df_fact.withColumn("y", F.year("fecha_donacion")) \
-                         .withColumn("m", F.lpad(F.month("fecha_donacion"), 2, "0")) \
-                         .withColumn("d", F.lpad(F.dayofmonth("fecha_donacion"), 2, "0"))
+                         .withColumn("m", F.lpad(F.month("fecha_donacion"), 2, "0"))
 
         # Select final columns
         df_final = df_fact.select(
@@ -66,12 +66,12 @@ def run_gold_fact_donaciones():
             "recencia_donaciones_dias",
             "anio_mes_donacion",
             "categoria_monto",
-            "y", "m", "d"
+            "y", "m"
         )
 
 
         (df_final.write.mode("overwrite")
-         .partitionBy("y", "m", "d")
+         .partitionBy("y", "m")
          .option("partitionOverwriteMode", "dynamic")
          .parquet(output_path))
          
