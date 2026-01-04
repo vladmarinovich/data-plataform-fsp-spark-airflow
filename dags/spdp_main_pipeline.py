@@ -42,6 +42,13 @@ with DAG(
         task_id='extract_from_supabase',
         bash_command=f"export ENV=cloud && {PYTHON_BIN} {PROJECT_ROOT}/scripts/extract_from_supabase.py",
     )
+    
+    # TAREA DE PRUEBA: Falla a propósito para probar shutdown
+    test_failure = BashOperator(
+        task_id='test_failure',
+        bash_command='echo "Simulando error..." && exit 1',
+    )
+
 
     # Reparticionamiento por fechas de negocio
     repartition_raw = BashOperator(
@@ -155,7 +162,7 @@ finally:
     
     # CAPA 0: EXTRACCIÓN Y REPARTICIONAMIENTO
     # ========================================
-    extract_supabase >> repartition_raw
+    extract_supabase >> test_failure >> repartition_raw
     
     # CAPA 1: SILVER (Esperan reparticionamiento)
     # ============================================
