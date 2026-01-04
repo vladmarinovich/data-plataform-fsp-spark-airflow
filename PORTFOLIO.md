@@ -1,10 +1,10 @@
 # 🐾 Salvando Patitas - Enterprise Data Platform
 **SPDP** = **Salvando Patitas Data Platform**  
-**Recruiter Summary:**  
-- **Role:** Solo Data Engineer (3‑week contract)  
+**Resumen para Reclutadores:**  
+- **Rol:** Data Engineer (Solo) - Proyecto de 3 semanas  
 - **Tech Stack:** PySpark, Apache Airflow, GCP (Compute Engine, Cloud Storage, BigQuery), Docker, Supabase, Slack  
-- **Key Achievements:** Built end‑to‑end data lakehouse, reduced pipeline runtime 90% (30 → 12 min), cut monthly cost to <$2, achieved 99.9% reliability, delivered real‑time financial dashboards.  
-- **Business Impact:** Enabled weekly financial health monitoring for a non‑profit, supporting >30 k historical records and $1 M+ cumulative balance.
+- **Logros Clave:** Construcción de Data Lakehouse end-to-end desde cero, reducción del 90% en latencia (30 → 12 min), costos optimizados a <$2 USD/mes, confiabilidad del 99.9% con monitoreo automatizado.  
+- **Impacto de Negocio:** Habilitación de inteligencia financiera semanal para la ONG, soportando >30k registros históricos y controlando un balance acumulado de >$1M.
 
 
 ---
