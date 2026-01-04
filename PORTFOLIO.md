@@ -64,6 +64,21 @@ Supabase (PostgreSQL)
 Looker Studio (Dashboards)
 ```
 
+### Visual Evidence
+
+**Architecture Diagram:**
+![Architecture](docs/Diagramas%20Apache%20-%20Arquitectura%20Data%20engineer.jpg)
+
+**Production Pipeline (Airflow):**
+![Airflow DAG Success](docs/images/airflow-dag-success.png)
+
+**Data in BigQuery:**
+![BigQuery Results](docs/images/bigquery-results.png)
+
+**Automated Scheduling:**
+![Cloud Scheduler](docs/images/cloud-scheduler.png)
+
+
 ---
 
 ## 💡 Key Technical Achievements
