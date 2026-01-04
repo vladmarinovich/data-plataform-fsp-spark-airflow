@@ -1,0 +1,103 @@
+[1;33m🚀 PIPELINE MANUAL EXECUTION[0m
+======================================
+
+[1;33m═══════════════════════════════════════[0m
+[1;33m  CAPA SILVER (Limpieza de datos)[0m
+[1;33m═══════════════════════════════════════[0m
+
+[1;33m► Ejecutando: donantes[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ donantes - SUCCESS[0m
+
+[1;33m► Ejecutando: casos[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ casos - SUCCESS[0m
+
+[1;33m► Ejecutando: donaciones[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ donaciones - SUCCESS[0m
+
+[1;33m► Ejecutando: gastos[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ gastos - SUCCESS[0m
+
+[1;33m► Ejecutando: proveedores[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ proveedores - SUCCESS[0m
+
+[1;33m► Ejecutando: hogar_de_paso[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ hogar_de_paso - SUCCESS[0m
+
+[1;33m═══════════════════════════════════════[0m
+[1;33m  CAPA GOLD - DIMENSIONS[0m
+[1;33m═══════════════════════════════════════[0m
+
+[1;33m► Ejecutando: dim_calendario[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dim_calendario - SUCCESS[0m
+
+[1;33m► Ejecutando: dim_donantes[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dim_donantes - SUCCESS[0m
+
+[1;33m► Ejecutando: dim_casos[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dim_casos - SUCCESS[0m
+
+[1;33m► Ejecutando: dim_proveedores[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dim_proveedores - SUCCESS[0m
+
+[1;33m► Ejecutando: dim_hogar_de_paso[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dim_hogar_de_paso - SUCCESS[0m
+
+[1;33m═══════════════════════════════════════[0m
+[1;33m  CAPA GOLD - FACTS[0m
+[1;33m═══════════════════════════════════════[0m
+
+[1;33m► Ejecutando: fact_donaciones[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ fact_donaciones - SUCCESS[0m
+
+[1;33m► Ejecutando: fact_gastos[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ fact_gastos - SUCCESS[0m
+
+[1;33m═══════════════════════════════════════[0m
+[1;33m  CAPA GOLD - FEATURES[0m
+[1;33m═══════════════════════════════════════[0m
+
+[1;33m► Ejecutando: feat_donantes[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ feat_donantes - SUCCESS[0m
+
+[1;33m► Ejecutando: feat_casos[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ feat_casos - SUCCESS[0m
+
+[1;33m► Ejecutando: feat_proveedores[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ feat_proveedores - SUCCESS[0m
+
+[1;33m═══════════════════════════════════════[0m
+[1;33m  CAPA GOLD - DASHBOARDS[0m
+[1;33m═══════════════════════════════════════[0m
+
+[1;33m► Ejecutando: dashboard_donaciones[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dashboard_donaciones - SUCCESS[0m
+
+[1;33m► Ejecutando: dashboard_gastos[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dashboard_gastos - SUCCESS[0m
+
+[1;33m► Ejecutando: dashboard_financiero[0m
+scripts/run_pipeline.sh: line 27: timeout: command not found
+[0;32m✅ dashboard_financiero - SUCCESS[0m
+
+[1;33m═══════════════════════════════════════[0m
+[1;33m  RESUMEN DE EJECUCIÓN[0m
+[1;33m═══════════════════════════════════════[0m
+[0;32m🎉 TODOS LOS JOBS EJECUTADOS EXITOSAMENTE[0m
