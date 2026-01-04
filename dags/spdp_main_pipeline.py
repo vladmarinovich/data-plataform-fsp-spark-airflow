@@ -19,8 +19,8 @@ default_args = {
     'start_date': datetime(2025, 12, 1),
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'retries': 2,  # 3 intentos totales (original + 2 retries)
+    'retry_delay': timedelta(minutes=3),  # Tiempo entre reintentos
     'on_failure_callback': slack_failure_callback, # 🔔 Alerta automática
 }
 
@@ -194,26 +194,12 @@ finally:
     # ---------------------------------------------------------
     # NIVEL 7: AUTO-APAGADO (COST SAVING)
     # ---------------------------------------------------------
-    # CRÍTICO: La VM se apaga SIEMPRE, incluso si el pipeline falla
-    stop_instance = BashOperator(
-        task_id='stop_instance',
-        bash_command="gcloud compute instances stop airflow-server-prod --zone=us-central1-a --quiet",
-        trigger_rule='all_done'  # Se ejecuta SIEMPRE (éxito o fallo)
-    )
-    
-    # Todas las tareas finales apuntan al shutdown
-    [
-        update_watermark,
-        g_dash_don,
-        g_dash_gastos, 
-        g_feat_casos,
-        g_feat_don,
-        g_feat_prov,
-        g_dim_don,
-        g_dim_casos,
-        g_dim_prov,
-        g_dim_hogar,
-        g_fact_don,
-        g_fact_gastos
-    ] >> stop_instance
+    # Solo apagar si estamos en entorno CLOUD
+    if os.getenv('ENV') == 'cloud':
+        stop_instance = BashOperator(
+            task_id='stop_instance',
+            bash_command="gcloud compute instances stop airflow-server-prod --zone=us-central1-a --quiet",
+            trigger_rule='all_success'  # Solo apagar si TODO salió bien
+        )
+        update_watermark >> stop_instance
 
