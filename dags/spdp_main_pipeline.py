@@ -194,12 +194,12 @@ finally:
     # ---------------------------------------------------------
     # NIVEL 7: AUTO-APAGADO (COST SAVING)
     # ---------------------------------------------------------
-    # Solo apagar si estamos en entorno CLOUD
+    # CRÍTICO: Se apaga SIEMPRE, incluso si el pipeline falla
     if os.getenv('ENV') == 'cloud':
         stop_instance = BashOperator(
             task_id='stop_instance',
             bash_command="gcloud compute instances stop airflow-server-prod --zone=us-central1-a --quiet",
-            trigger_rule='all_success'  # Solo apagar si TODO salió bien
+            trigger_rule='all_done'  # SIEMPRE se ejecuta (éxito o fallo)
         )
         update_watermark >> stop_instance
 
