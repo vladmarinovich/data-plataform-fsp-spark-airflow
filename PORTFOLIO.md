@@ -6,218 +6,216 @@
 - **Logros Clave:** Construcción de Data Lakehouse end-to-end desde cero, reducción del 90% en latencia (30 → 12 min), costos optimizados a <$2 USD/mes, confiabilidad del 99.9% con monitoreo automatizado.  
 - **Impacto de Negocio:** Habilitación de inteligencia financiera semanal para la ONG, soportando >30k registros históricos y controlando un balance acumulado de >$1M.
 
+---
+
+## 📋 Resumen del Proyecto
+
+**Organización:** Salvando Patitas (ONG de Rescate Animal)  
+**Rol:** Data Engineer (Solo)  
+**Duración:** 3 semanas (Diciembre 2025 - Enero 2026)  
+**Estado:** ✅ Producción (Ejecuciones semanales automatizadas)
+
+### Problema de Negocio
+
+Salvando Patitas necesitaba una plataforma de datos escalable y rentable para:
+- Rastrear donaciones, gastos y casos de rescate a través de más de 4 años de historia.
+- Habilitar la toma de decisiones basada en datos para la asignación de recursos.
+- Proporcionar monitoreo de salud financiera en tiempo real.
+- Soportar tableros de inteligencia de negocios (BI).
+
+### Solución Entregada
+
+Se construyó una plataforma de datos nativa en la nube (cloud-native) de extremo a extremo que:
+- ✅ Procesa más de 30,000 registros históricos automáticamente.
+- ✅ Se ejecuta semanalmente sin intervención manual.
+- ✅ Cuesta ~$1-2 USD/mes (99% de reducción de costos vs. soluciones gestionadas).
+- ✅ Entrega datos a BigQuery para herramientas de BI (Looker Studio).
+- ✅ Proporciona una confiabilidad del 99.9% con monitoreo automatizado via Slack.
 
 ---
 
-## 📋 Project Overview
+## 🏗️ Arquitectura Técnica
 
-**Organization:** Salvando Patitas (Animal Rescue Non-Profit)  
-**Role:** Data Engineer (Solo)  
-**Duration:** 3 weeks (December 2025 - January 2026)  
-**Status:** ✅ Production (Automated weekly runs)
+### Stack Tecnológico
 
-### Business Problem
-
-Salvando Patitas needed a scalable, cost-effective data platform to:
-- Track donations, expenses, and rescue cases across 4+ years of history
-- Enable data-driven decision making for resource allocation
-- Provide real-time financial health monitoring
-- Support business intelligence dashboards
-
-### Solution Delivered
-
-Built an end-to-end cloud-native data platform that:
-- ✅ Processes 30,000+ historical records automatically
-- ✅ Runs weekly with zero manual intervention
-- ✅ Costs ~$1-2/month (99% cost reduction vs. managed solutions)
-- ✅ Delivers data to BigQuery for BI tools (Looker Studio)
-- ✅ Provides 99.9% reliability with automated monitoring
-
----
-
-## 🏗️ Technical Architecture
-
-### Stack
-
-| Layer | Technology | Purpose |
+| Capa | Tecnología | Propósito |
 |-------|-----------|---------|
-| **Orchestration** | Apache Airflow 2.10 | Workflow automation & scheduling |
-| **Processing** | Apache Spark 3.5 (PySpark) | Distributed data transformation |
-| **Storage** | Google Cloud Storage | Data Lake (Bronze/Silver/Gold) |
-| **Warehouse** | BigQuery | Analytics & BI |
-| **Source** | Supabase (PostgreSQL) | Transactional database |
-| **Infra** | GCP Compute Engine + Docker | Cloud-native deployment |
-| **Monitoring** | Slack Webhooks | Real-time alerts |
-| **CI/CD** | GitHub Actions | Automated deployments |
+| **Orquestación** | Apache Airflow 2.10 | Automatización de flujos de trabajo y programación |
+| **Procesamiento** | Apache Spark 3.5 (PySpark) | Transformación distribuida de datos |
+| **Almacenamiento** | Google Cloud Storage | Data Lake (Bronze/Silver/Gold) |
+| **Warehouse** | BigQuery | Analítica y BI |
+| **Fuente** | Supabase (PostgreSQL) | Base de datos transaccional |
+| **Infraestructura** | GCP Compute Engine + Docker | Despliegue Cloud-native |
+| **Monitoreo** | Slack Webhooks | Alertas en tiempo real |
+| **CI/CD** | GitHub Actions | Despliegues automatizados |
 
-### Architecture Pattern
+### Patrón de Arquitectura
 
-**Medallion Architecture** (Bronze → Silver → Gold)
+**Arquitectura Medallion** (Bronze → Silver → Gold)
 
 ```
 Supabase (PostgreSQL)
     ↓
-[Extract Script] → GCS Bronze (Raw Parquet, partitioned by date)
+[Script de Extracción] → GCS Bronze (Parquet Raw, particionado por fecha)
     ↓
-[Spark Silver Jobs] → GCS Silver (Cleaned, deduplicated, monthly partitions)
+[Spark Silver Jobs] → GCS Silver (Limpieza, deduplicación, particiones mensuales)
     ↓
-[Spark Gold Jobs] → GCS Gold (Dimensional model - Star Schema)
+[Spark Gold Jobs] → GCS Gold (Modelo dimensional - Esquema Estrella)
     ↓
-[Load Job] → BigQuery (Analytics-ready tables)
+[Job de Carga] → BigQuery (Tablas listas para analítica)
     ↓
 Looker Studio (Dashboards)
 ```
 
-### Visual Evidence
+### Evidencia Visual
 
-**Architecture Diagram:**
-![Architecture](docs/Diagramas%20Apache%20-%20Arquitectura%20Data%20engineer.jpg)
+**Diagrama de Arquitectura:**
+![Arquitectura](docs/Diagramas%20Apache%20-%20Arquitectura%20Data%20engineer.jpg)
 
-**Production Pipeline (Airflow):**
-![Airflow DAG Success](docs/images/airflow-dag-success.png)
+**Pipeline en Producción (Airflow):**
+![Éxito DAG Airflow](docs/images/airflow-dag-success.png)
 
-**Data in BigQuery:**
-![BigQuery Results](docs/images/bigquery-results.png)
+**Datos en BigQuery:**
+![Resultados BigQuery](docs/images/bigquery-results.png)
 
-**Automated Scheduling:**
+**Programación Automatizada:**
 ![Cloud Scheduler](docs/images/cloud-scheduler.png)
 
+---
+
+## 💡 Logros Técnicos Clave
+
+### 1. Optimización de Rendimiento (Reducción de Latencia del 90%)
+
+**Desafío:** El pipeline inicial tardaba más de 30 minutos y fallaba debido a errores de memoria (OOM).
+
+**Solución:**
+- Implementación de gestión estricta de memoria (máx 2 jobs concurrentes).
+- Optimización de la estrategia de particionamiento (diario → mensual: 30x menos archivos).
+- Deshabilitado el renombrado de archivos (eliminación de overhead de copia+borrado en GCS).
+
+**Resultado:** Latencia del pipeline reducida de 30+ min a **12-14 minutos** (mejora del 90%).
+
+### 2. Optimización de Costos (Reducción de Costos del 99%)
+
+**Desafío:** Las soluciones gestionadas (Fivetran, dbt Cloud) costaban $100-500 USD/mes.
+
+**Solución:**
+- Desarrollo de scripts de extracción personalizados con carga incremental.
+- Aprovechamiento del tier gratuito de GCP + instancias spot.
+- Implementación de auto-apagado (la VM corre solo 12 min/semana).
+
+**Resultado:** Costo total **~$1-2 USD/mes** (ahorro del 99%).
+
+### 3. Ingeniería de Confiabilidad (99.9% Uptime)
+
+**Desafío:** Los fallos en el pipeline dejaban la VM encendida, incurriendo en costos.
+
+**Solución:**
+- Implementación de `trigger_rule='all_done'` para la tarea de apagado.
+- Adición de 3 reintentos automáticos por tarea (intervalos de 3 minutos).
+- Configuración de alertas de Slack para fallos.
+- Construcción de sistema de marcas de agua (watermarking) para cargas incrementales.
+
+**Resultado:** Cero intervenciones manuales en producción.
+
+### 4. Framework de Calidad de Datos
+
+**Implementado:**
+- Validación de esquema en la ingestión.
+- Lógica de deduplicación (claves compuestas).
+- Sistema de cuarentena para registros inválidos.
+- Chequeos de calidad de datos (tasas de nulos, valores atípicos).
+
+**Resultado:** 100% de precisión de datos verificada contra la fuente.
 
 ---
 
-## 💡 Key Technical Achievements
+## 📊 Impacto en el Negocio
 
-### 1. Performance Optimization (90% Latency Reduction)
+### Insights Financieros Entregados
 
-**Challenge:** Initial pipeline took 30+ minutes and crashed due to OOM errors.
+- **Rastreo de Balance:** Monitoreo de un balance acumulado de más de $1M.
+- **Análisis de Runway:** Métricas de sostenibilidad financiera (meses de operación).
+- **Monitoreo de Presupuesto:** Detección de sobregastos en tiempo real.
+- **Analítica de Donantes:** Segmentación RFM para recaudación de fondos.
 
-**Solution:**
-- Implemented strict memory management (2 concurrent jobs max)
-- Optimized partitioning strategy (daily → monthly: 30x fewer files)
-- Disabled file renaming (eliminated copy+delete overhead in GCS)
+### Métricas Operativas
 
-**Result:** Pipeline latency reduced from 30+ min to **12-14 minutes** (90% improvement)
-
-### 2. Cost Optimization (99% Cost Reduction)
-
-**Challenge:** Managed solutions (Fivetran, dbt Cloud) cost $100-500/month.
-
-**Solution:**
-- Built custom extraction scripts with incremental loading
-- Leveraged GCP free tier + spot instances
-- Implemented auto-shutdown (VM runs only 12 min/week)
-
-**Result:** Total cost **$1-2/month** (99% savings)
-
-### 3. Reliability Engineering (99.9% Uptime)
-
-**Challenge:** Pipeline failures left VM running, incurring costs.
-
-**Solution:**
-- Implemented `trigger_rule='all_done'` for shutdown task
-- Added 3 automatic retries per task (3-minute intervals)
-- Configured Slack alerts for failures
-- Built watermarking system for incremental loads
-
-**Result:** Zero manual interventions in production
-
-### 4. Data Quality Framework
-
-**Implemented:**
-- Schema validation at ingestion
-- Deduplication logic (composite keys)
-- Quarantine system for invalid records
-- Data quality checks (null rates, outliers)
-
-**Result:** 100% data accuracy verified against source
-
----
-
-## 📊 Business Impact
-
-### Financial Insights Delivered
-
-- **Balance Tracking:** $1M+ cumulative balance monitored
-- **Runway Analysis:** Financial sustainability metrics (months of operation)
-- **Budget Monitoring:** Real-time overspend detection
-- **Donor Analytics:** RFM segmentation for fundraising
-
-### Operational Metrics
-
-| Metric | Value |
+| Métrica | Valor |
 |--------|-------|
-| **Historical Data Processed** | 30,000+ records (2022-2026) |
-| **Pipeline Execution Time** | 12-14 minutes |
-| **Frequency** | Weekly (Sundays 23:30 UTC) |
-| **Reliability** | 99.9% (automated retries) |
-| **Monthly Cost** | $1-2 USD |
-| **Tables in BigQuery** | 11 (3 dashboards, 3 facts, 5 dimensions) |
+| **Datos Históricos Procesados** | 30,000+ registros (2022-2026) |
+| **Tiempo de Ejecución del Pipeline** | 12-14 minutos |
+| **Frecuencia** | Semanal (Domingos 23:30 UTC) |
+| **Confiabilidad** | 99.9% (reintentos automatizados) |
+| **Costo Mensual** | $1-2 USD |
+| **Tablas en BigQuery** | 11 (3 dashboards, 3 facts, 5 dimensiones) |
 
 ---
 
-## 🛠️ Technical Skills Demonstrated
+## 🛠️ Habilidades Técnicas Demostradas
 
-### Data Engineering
-- ✅ Apache Spark (PySpark) - Distributed data processing
-- ✅ Apache Airflow - Workflow orchestration & DAG design
-- ✅ Data Modeling - Kimball dimensional modeling (Star Schema)
-- ✅ ETL/ELT - Incremental loading, watermarking, idempotency
-- ✅ Data Quality - Validation, deduplication, quarantine systems
+### Ingeniería de Datos
+- ✅ Apache Spark (PySpark) - Procesamiento de datos distribuido
+- ✅ Apache Airflow - Orquestación de flujos de trabajo y diseño de DAGs
+- ✅ Modelado de Datos - Modelado dimensional Kimball (Esquema Estrella)
+- ✅ ETL/ELT - Carga incremental, watermarking, idempotencia
+- ✅ Calidad de Datos - Validación, deduplicación, sistemas de cuarentena
 
-### Cloud & Infrastructure
+### Cloud e Infraestructura
 - ✅ Google Cloud Platform (GCS, BigQuery, Compute Engine, Cloud Scheduler)
-- ✅ Docker & Docker Compose - Containerization
-- ✅ Linux/Bash - System administration
-- ✅ Git & GitHub - Version control, CI/CD
+- ✅ Docker y Docker Compose - Contenerización
+- ✅ Linux/Bash - Administración de sistemas
+- ✅ Git y GitHub - Control de versiones, CI/CD
 
-### Databases
-- ✅ PostgreSQL (Supabase) - Source system
-- ✅ BigQuery - Analytics warehouse
-- ✅ Parquet - Columnar storage optimization
+### Bases de Datos
+- ✅ PostgreSQL (Supabase) - Sistema fuente
+- ✅ BigQuery - Warehouse analítico
+- ✅ Parquet - Optimización de almacenamiento columnar
 
-### Programming
-- ✅ Python 3.11 - Primary language
-- ✅ SQL - Complex analytical queries
-- ✅ YAML - Configuration management
+### Programación
+- ✅ Python 3.11 - Lenguaje principal
+- ✅ SQL - Consultas analíticas complejas
+- ✅ YAML - Gestión de configuración
 
-### Best Practices
-- ✅ Cost optimization
-- ✅ Performance tuning
-- ✅ Monitoring & alerting
-- ✅ Documentation
-- ✅ Error handling & retries
-
----
-
-## 📈 Scalability
-
-**Current:** 30,000 records, 12-14 min execution  
-**Tested for:** 300,000 records (10x growth)  
-**Architecture supports:** 3M+ records with minimal changes
+### Mejores Prácticas
+- ✅ Optimización de costos
+- ✅ Ajuste de rendimiento (Performance tuning)
+- ✅ Monitoreo y alertas
+- ✅ Documentación
+- ✅ Manejo de errores y reintentos
 
 ---
 
-## 🔗 Links
+## 📈 Escalabilidad
 
-- **GitHub Repository:** [data-plataform-fsp-spark-airflow](https://github.com/vladmarinovich/data-plataform-fsp-spark-airflow)
-- **Live Dashboard:** (Looker Studio - Available upon request)
-- **Technical Documentation:** See `/docs` folder in repo
+**Actual:** 30,000 registros, 12-14 min ejecución  
+**Probado para:** 300,000 registros (crecimiento 10x)  
+**Arquitectura soporta:** 3M+ registros con cambios mínimos
 
 ---
 
-## 🎯 Key Takeaways
+## 🔗 Enlaces
 
-This project demonstrates my ability to:
+- **Repositorio GitHub:** [data-plataform-fsp-spark-airflow](https://github.com/vladmarinovich/data-plataform-fsp-spark-airflow)
+- **Dashboard en Vivo:** (Looker Studio - Disponible bajo solicitud)
+- **Documentación Técnica:** Ver carpeta `/docs` en el repo
 
-1. **Build production-grade systems from scratch** - No tutorials, real-world constraints
-2. **Optimize for cost and performance** - 99% cost reduction, 90% latency improvement
-3. **Work with modern data stack** - Spark, Airflow, GCP, BigQuery
-4. **Solve complex technical problems** - OOM errors, schema drift, data quality
-5. **Deliver business value** - From raw data to actionable insights
+---
 
-**Built in 3 weeks. Running in production. Zero manual intervention.**
+## 🎯 Conclusiones Clave
+
+Este proyecto demuestra mi habilidad para:
+
+1. **Construir sistemas de grado de producción desde cero** - Sin tutoriales, con restricciones del mundo real.
+2. **Optimizar costos y rendimiento** - 99% reducción de costos, 90% mejora en latencia.
+3. **Trabajar con stack de datos moderno** - Spark, Airflow, GCP, BigQuery.
+4. **Resolver problemas técnicos complejos** - Errores OOM, deriva de esquemas (schema drift), calidad de datos.
+5. **Entregar valor de negocio** - De datos crudos a insights accionables.
+
+**Construido en 3 semanas. Corriendo en producción. Cero intervención manual.**
 
 ---
 
 *Vladislav Marinovich | Data Engineer*  
-*Contact: consultor@vladmarinovich.com*
+*Contacto: consultor@vladmarinovich.com*
