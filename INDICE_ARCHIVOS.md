@@ -1,37 +1,80 @@
+# 📂 Índice del Proyecto SPDP
 
-# 📂 Índice de Archivos Clave
+Este proyecto consta de **65 archivos** esenciales distribuidos así:
 
-Estructura del proyecto y descripción de los componentes más importantes.
+## 1. Orquestación (Airflow)
+- dags/__init__.py
+- dags/spdp_main_pipeline.py
 
----
+## 2. Lógica de Negocio (Spark Jobs)
+- jobs/transform_donations.py
+- jobs/silver/hogar_de_paso.py
+- jobs/silver/gastos.py
+- jobs/silver/donantes.py
+- jobs/silver/casos.py
+- jobs/silver/donaciones.py
+- jobs/silver/proveedores.py
+- jobs/__init__.py
+- jobs/utils/alerts.py
+- jobs/utils/spark_session.py
+- jobs/utils/watermark.py
+- jobs/utils/__init__.py
+- jobs/utils/file_utils.py
+- jobs/utils/data_quality.py
+- jobs/gold/dim_proveedores.py
+- jobs/gold/dim_donantes.py
+- jobs/gold/dashboard_financiero.py
+- jobs/gold/upload_to_bucket.py
+- jobs/gold/feat_proveedores.py
+- jobs/gold/dim_calendario.py
+- jobs/gold/feat_donantes.py
+- jobs/gold/dim_casos.py
+- jobs/gold/fact_donaciones.py
+- jobs/gold/dim_hogar_de_paso.py
+- jobs/gold/fact_gastos.py
+- jobs/gold/feat_casos.py
+- jobs/gold/dashboard_gastos.py
+- jobs/gold/dashboard_donaciones.py
+- jobs/common.py
 
-## 🛠️ Scripts Operativos (Capa Raw)
+## 3. Scripts de Ingesta
+- scripts/debug_gcs_watermark.py
+- scripts/verify_gold_dims.py
+- scripts/verify_gcs_files.py
+- scripts/clean_bucket.py
+- scripts/debug_gastos_leak.py
+- scripts/manage_watermark.py
+- scripts/verify_gold_data.py
+- scripts/force_extract_casos.py
+- scripts/test_extraction.py
+- scripts/debug_donantes_nulls.py
+- scripts/test_gcs_spark.py
+- scripts/debug_donantes_count.py
+- scripts/quick_mock_data.py
+- scripts/verify_cloud_data.py
+- scripts/reextract_donantes.py
+- scripts/load_to_bigquery.py
+- scripts/debug_casos_missing.py
+- scripts/upload_to_gcs.py
+- scripts/extract_from_supabase.py
+- scripts/generate_mock_data.py
+- scripts/run_gold_layer.py
+- scripts/clean_raw_dims.py
+- scripts/repartition_raw.py
+- scripts/analyze_donantes_leak.py
+- scripts/setup_gcp.py
+- scripts/upload_to_gcs_and_bq.py
+- scripts/create_external_tables.py
+- scripts/inspect_quarantine.py
+- scripts/finalize_pipeline.py
 
-| Archivo | Descripción |
-| :--- | :--- |
-| **`scripts/extract_from_supabase.py`** | **Extractor ETL**. Conecta a Supabase, descarga datos incrementalmente usando `watermarks.json` y los guarda en parquet local. |
-| **`scripts/upload_to_gcs.py`** | **Cargador Cloud**. Lee parquets locales, limpia tipos de datos (Int64, Timestamp Micros) y sube a GCS con particionamiento Hive. |
-| **`scripts/create_external_tables.py`** | **Definidor DDL**. Crea/Actualiza tablas externas en BigQuery apuntando a GCS. |
+## 4. Documentación & Portfolio
+- docs/EXTRACCION_SUPABASE.md
+- docs/ARCHITECTURE.md
+- docs/QUICKSTART.md
+- PORTFOLIO.md
+- README.md
 
-## ⚙️ Configuración
-
-| Archivo | Descripción |
-| :--- | :--- |
-| **`config/__init__.py`** | **Configuración Central**. Define rutas, nombres de buckets, schemas esperados y reglas de particionado. |
-| **`.env`** | **Secretos**. Variables de entorno (no commitear). |
-| **`watermarks.json`** | **Estado ETL**. Mantiene la fecha de última sincronización (`last_modified_at`) de cada tabla. |
-
-## 🏗️ Spark Jobs (Transformación)
-
-| Archivo | Descripción |
-| :--- | :--- |
-| `jobs/common.py` | Utilidades compartidas para Spark (Session, Logging). |
-| `jobs/silver/*.py` | *(En desarrollo)* Scripts para transformar Raw -> Silver. |
-
-## 📚 Documentación
-
-| Archivo | Descripción |
-| :--- | :--- |
-| `README.md` | Documentación general de arquitectura y proyecto. |
-| `INICIO_RAPIDO.md` | Guía "Cheat Sheet" para operar la carga diaria. |
-| `RESUMEN_EJECUTIVO.md` | Estado del arte y logros del proyecto. |
+## 5. Configuración Infra
+- ./docker-compose.yaml
+- ./docker-compose.prod.yaml
