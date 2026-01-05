@@ -15,10 +15,10 @@ Esta plataforma implementa una arquitectura moderna de **Data Lakehouse** utiliz
 
 ```mermaid
 graph LR
-    SRC[Supabase (PostgreSQL)] -->|Script de Extracción| RAW[GCS Data Lake (Raw)]
-    RAW -->|Spark (Limpieza/Deduplicación)| SILVER[GCS Data Lake (Silver)]
-    SILVER -->|Spark (Agregación)| GOLD[GCS Data Lake (Gold)]
-    GOLD -->|Carga| BQ[BigQuery Data Warehouse]
+    SRC[Supabase PostgreSQL] -->|Script de Extracción| RAW[GCS Data Lake - Raw]
+    RAW -->|Spark Limpieza| SILVER[GCS Data Lake - Silver]
+    SILVER -->|Spark Agregación| GOLD[GCS Data Lake - Gold]
+    GOLD -->|Carga| BQ[BigQuery DW]
     BQ -->|Conexión| BI[Looker Studio]
 ```
 

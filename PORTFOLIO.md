@@ -3,7 +3,7 @@
 **Resumen para Reclutadores:**  
 - **Rol:** Data Engineer (Solo) - Proyecto de 3 semanas  
 - **Tech Stack:** PySpark, Apache Airflow, GCP (Compute Engine, Cloud Storage, BigQuery), Docker, Supabase, Slack  
-- **Logros Clave:** Construcción de Data Lakehouse end-to-end desde cero, reducción del 90% en latencia (30 → 12 min), costos optimizados a <$2 USD/mes, confiabilidad del 99.9% con monitoreo automatizado.  
+- **Logros Clave:** Construcción de Data Lakehouse end-to-end desde cero, reducción del 90% en latencia (30 → 12 min), costos optimizados a ~$5 USD/mes (vs $500+ managed), confiabilidad del 99.9% con monitoreo automatizado.  
 - **Impacto de Negocio:** Habilitación de inteligencia financiera semanal para la ONG, soportando >30k registros históricos y controlando un balance acumulado de >$1M.
 
 ---
@@ -28,7 +28,7 @@ Salvando Patitas necesitaba una plataforma de datos escalable y rentable para:
 Se construyó una plataforma de datos nativa en la nube (cloud-native) de extremo a extremo que:
 - ✅ Procesa más de 30,000 registros históricos automáticamente.
 - ✅ Se ejecuta semanalmente sin intervención manual.
-- ✅ Cuesta ~$1-2 USD/mes (99% de reducción de costos vs. soluciones gestionadas).
+- ✅ Cuesta ~$5-7 USD/mes (principalmente costo fijo de almacenamiento PD-SSD).
 - ✅ Entrega datos a BigQuery para herramientas de BI (Looker Studio).
 - ✅ Proporciona una confiabilidad del 99.9% con monitoreo automatizado via Slack.
 
