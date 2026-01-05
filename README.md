@@ -9,9 +9,11 @@
 
 ---
 
-## 🏗️ Arquitectura
-
 Esta plataforma implementa una arquitectura moderna de **Data Lakehouse** utilizando infraestructura gestionada en GCP.
+
+![Arquitectura SPDP](docs/images/architecture-diagram-visual.jpg)
+
+### Flujo de Datos (Detalle)
 
 ```mermaid
 graph LR
@@ -32,6 +34,9 @@ graph LR
       - Dimensions (Donantes, Casos): Modo `overwrite` - snapshot mensual limpio.
     - **Calidad de Datos**: Deduplicación, validación de esquemas, cuarentena para registros inválidos.
 3.  **Gold (Curada):** Agregados a nivel de negocio, modelos dimensionales (Esquema Estrella) e ingeniería de características (RFM, LTV).
+
+### ✅ Evidencia de Ejecución (Airflow DAG)
+![Ejecución Exitosa Airflow](docs/images/airflow-dag-success.png)
 
 ---
 
