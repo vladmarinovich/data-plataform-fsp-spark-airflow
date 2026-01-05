@@ -153,22 +153,10 @@ def extract_table(
     batch_size = 200 # Reducido para evitar OOM (SIGTERM)
     max_date_str = None # Inicializar variable para scope
 
-    # LÍMITE TRIMESTRAL: Procesar máximo 3 meses por ejecución
-    from datetime import datetime, timedelta
-    
-    # Calcular fecha límite superior (watermark + 3 meses)
-    # [MODIFICADO] Se eliminan límites trimestrales para permitir carga histórica completa
-    # El manejo de memoria depende de la paginación y del DataFrame final.
-    if watermark and not is_snapshot:
-        # Aquí podrías reactivar una ventana deslizante si quisieras, 
-        # pero por ahora dejamos que traiga todo lo nuevo hasta HOY.
-        pass 
-        
-    elif not is_snapshot:
+    # Lógica simplificada: Traer todo lo nuevo hasta hoy
+    if not watermark and not is_snapshot:
         # Carga Inicial (Clean Slate)
         print(f"   🚀 Detectada Carga Inicial (Clean Slate). Extrayendo TODO el histórico.")
-        # Se eliminaron las restricciones de Q1 2023
-        pass
 
     # No hay límite superior forzado
     max_date_str = None
