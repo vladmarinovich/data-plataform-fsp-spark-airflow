@@ -158,7 +158,9 @@ def extract_table(
         # Carga Inicial (Clean Slate)
         print(f"   🚀 Detectada Carga Inicial (Clean Slate). Extrayendo TODO el histórico.")
 
-    # No hay límite superior forzado
+    # [CONFIG] Límite de carga:
+    # - En Producción: None (Traer TODO lo nuevo).
+    # - En Local: Puedes poner una fecha (ej: '2023-12-31') para evitar que explote tu PC si hay mucha historia.
     max_date_str = None
     
     try:
